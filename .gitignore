@@ -1,0 +1,10 @@
+build/
+sdkconfig
+sdkconfig.old
+__pycache__/
+.venv/
+.env
+*.pdf
+~$*
+docs/reference/
+docs/photos/v1_1/
