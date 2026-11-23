@@ -62,7 +62,7 @@ def main_menu(sys):
         sys.push(Snake(sys))
 
     def open_info():
-        sys.push(TextView(sys, 'Info', 'Auri OS %s\nNokia Auri-3310\nUn 3310 del 2000 con un cervello nuovo.' % VERSION))
+        sys.push(TextView(sys, 'Info', 'Auri OS %s\nAuri-3310\nUn 3310 del 2000 con un cervello nuovo.' % VERSION))
 
     return Menu(sys, 'Menu', [
         ('1 Claude', open_claude),

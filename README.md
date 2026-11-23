@@ -1,4 +1,4 @@
-# Nokia Auri-3310
+# Auri-3310
 
 English | [Italiano](README.it.md)
 
@@ -10,7 +10,7 @@ The plan is easy to say and harder to do: pull out the original mainboard and re
 
 ## Where things stand
 
-The phone is apart and photographed, I've studied the board and written the [project plan](docs/Nokia_Auri-3310_Piano_Maestro_v2_0.docx) (in Italian for now). Software has started: Auri OS is written in MicroPython and already runs in a PC simulator, with menus, T9 typing and the first game. The 1:1 board scans are in `docs/scans`.
+The phone is apart and photographed, I've studied the board and written the [project plan](docs/Auri-3310_Piano_Maestro_v2_0.docx) (in Italian for now). Software has started: Auri OS is written in MicroPython and already runs in a PC simulator, with menus, T9 typing and the first game. The 1:1 board scans are in `docs/scans`.
 
 ![Auri OS in the simulator](docs/screenshots/1_home.png)
 

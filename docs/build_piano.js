@@ -68,7 +68,7 @@ const sp = () => new Paragraph({ children: [] });
 
 const body = [
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 600 }, children: [new TextRun({ text: 'PROGETTO OPEN HARDWARE', size: 20, color: '556B2F', bold: true })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nokia Auri-3310', size: 64, bold: true })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Auri-3310', size: 64, bold: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [new TextRun({ text: 'Un Nokia 3310 originale con cervello ESP32-S3, Wi-Fi, Home Assistant e una shell Claude in tasca', size: 26, italics: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Piano Maestro v2.0  |  23 novembre 2026  |  Autore: Luigi Califano', size: 20 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [new TextRun({ text: 'Sostituisce "3310OS Piano Maestro v1.1". Le parti valide sono state mantenute, le decisioni aperte sono state chiuse.', size: 18, color: '666666' })] }),
@@ -222,7 +222,7 @@ const body = [
 ];
 
 const doc = new Document({
-  creator: 'Luigi Califano', title: 'Nokia Auri-3310 Piano Maestro v2.0',
+  creator: 'Luigi Califano', title: 'Auri-3310 Piano Maestro v2.0',
   styles: {
     default: { document: { run: { font: 'Calibri', size: 22 } } },
     paragraphStyles: [
@@ -236,8 +236,8 @@ const doc = new Document({
   ] },
   sections: [{
     properties: { page: { margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } },
-    footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Nokia Auri-3310  |  Piano Maestro v2.0  |  pagina ', size: 16, color: '888888' }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: '888888' })] })] }) },
+    footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Auri-3310  |  Piano Maestro v2.0  |  pagina ', size: 16, color: '888888' }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: '888888' })] })] }) },
     children: body,
   }],
 });
-Packer.toBuffer(doc).then(b => { fs.writeFileSync(path.join(ROOT, 'docs', 'Nokia_Auri-3310_Piano_Maestro_v2_0.docx'), b); console.log('ok'); });
+Packer.toBuffer(doc).then(b => { fs.writeFileSync(path.join(ROOT, 'docs', 'Auri-3310_Piano_Maestro_v2_0.docx'), b); console.log('ok'); });

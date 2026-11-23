@@ -1,4 +1,4 @@
-# Nokia Auri-3310
+# Auri-3310
 
 [English](README.md) | Italiano
 
@@ -10,7 +10,7 @@ L'idea è semplice da dire e un po' meno da fare: togliere la scheda madre origi
 
 ## A che punto siamo
 
-Il telefono è smontato e fotografato. Ho studiato la scheda e scritto il [piano di progetto](docs/Nokia_Auri-3310_Piano_Maestro_v2_0.docx). Il software è partito: Auri OS è scritto in MicroPython e gira già in un simulatore sul PC, con menu, scrittura T9 e il primo gioco. Le scansioni 1:1 della scheda sono in `docs/scans`.
+Il telefono è smontato e fotografato. Ho studiato la scheda e scritto il [piano di progetto](docs/Auri-3310_Piano_Maestro_v2_0.docx). Il software è partito: Auri OS è scritto in MicroPython e gira già in un simulatore sul PC, con menu, scrittura T9 e il primo gioco. Le scansioni 1:1 della scheda sono in `docs/scans`.
 
 ![Auri OS nel simulatore](docs/screenshots/1_home.png)
 
