@@ -3,13 +3,14 @@ from auri.ui import App, Menu, TextView, Confirm, header
 from auri.t9 import MultiTap
 from auri.gfx import W, H, wrap
 
+# Auri's own mascot: a tiny antenna robot.
 MASCOT = (
-    '.#########.',
-    '.##.###.##.',
-    '###########',
-    '###########',
-    '.#########.',
-    '.#.#...#.#.',
+    '.....#.....',
+    '..#######..',
+    '.#.......#.',
+    '.#.##.##.#.',
+    '.#.......#.',
+    '..#######..',
     '.#.#...#.#.',
 )
 MODELS = (('Opus 5.5', 'claude-opus-5-5'), ('Sonnet 5.5', 'claude-sonnet-5-5'),
