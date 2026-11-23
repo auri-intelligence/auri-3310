@@ -69,6 +69,20 @@ class PCHal:
     def battery_level(self):
         return 4
 
+    def sensors(self):
+        t = time.time()
+        return {'temperature': round(21.5 + 0.3 * ((t // 60) % 3), 1), 'humidity': 48, 'pressure': 1013.2,
+                'light': 120, 'tilt': (0.0, 0.0, 1.0)}
+
+    def voice_start(self):
+        return False
+
+    def voice_stop(self, url, params, token):
+        pass
+
+    def voice_poll(self):
+        return {'error': 'Voce solo nel simulatore web'}
+
     def random(self, n):
         return random.randrange(n)
 

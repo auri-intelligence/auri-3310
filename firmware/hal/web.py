@@ -43,6 +43,19 @@ class WebHal:
     def battery_level(self):
         return 4
 
+    def sensors(self):
+        return json.loads(str(js.auriSensors()))
+
+    def voice_start(self):
+        return bool(js.auriVoiceStart())
+
+    def voice_stop(self, url, params, token):
+        js.auriVoiceStop(url, json.dumps(params), token or '')
+
+    def voice_poll(self):
+        r = str(js.auriVoicePoll())
+        return json.loads(r) if r else None
+
     def random(self, n):
         return int(js.Math.random() * n)
 

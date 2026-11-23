@@ -9,6 +9,13 @@ Copyright (c) 2012 Adafruit Industries. BSD License: redistribution and use in s
 
 # Trademarks
 
-Nokia and 3310 are trademarks of Nokia Corporation. Claude and Claude Code are trademarks of Anthropic.
-They are used here only to describe compatibility. This is an independent personal project, not affiliated with or endorsed by either company.
+Nokia and 3310 are trademarks of Nokia Corporation. Claude and Claude Code are trademarks of Anthropic. Gemini and Google are trademarks of Google LLC.
+They are used here only to describe compatibility. This is an independent personal project, not affiliated with or endorsed by any of these companies.
 No Nokia firmware, manuals, logos or artwork are included in this repository.
+
+# Voice (bridge, downloaded by setup into bridge/models, not stored in this repository)
+
+**Piper** text-to-speech, MIT License. Voice **it_IT-paola-medium** from rhasspy/piper-voices: dataset CC0 (OHF-Voice voice-datasets), fine-tuned from a base model trained on the Hi-Fi TTS dataset (speaker 92), CC BY 4.0.
+**faster-whisper**, MIT License (SYSTRAN). Whisper models by OpenAI, MIT License.
+**Claude Agent SDK**, used under Anthropic's terms; it requires your own Claude login or API key.
+**Google Gemini API**, a Google service used by the AurI assistant under the Google APIs Terms and the Gemini API Additional Terms of Service. It needs your own API key, kept in an environment variable on the bridge. On the free tier Google may use prompts and answers to improve its products, so don't say anything to AurI you wouldn't want stored.

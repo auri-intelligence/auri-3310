@@ -56,6 +56,21 @@ class Keypad:
         return ev
 
 
+class SHT40:
+    ADDR = 0x44
+
+    def __init__(self, i2c):
+        self.i2c = i2c
+
+    def read(self):
+        self.i2c.writeto(self.ADDR, b'\xfd')
+        time.sleep_ms(10)
+        d = self.i2c.readfrom(self.ADDR, 6)
+        t = -45 + 175 * ((d[0] << 8) | d[1]) / 65535
+        h = -6 + 125 * ((d[3] << 8) | d[4]) / 65535
+        return round(t, 1), round(max(0, min(100, h)))
+
+
 class ESP32Hal:
     def __init__(self):
         self.lcd = PCD8544()
@@ -64,6 +79,9 @@ class ESP32Hal:
         self.vib = machine.Pin(board.VIBRA, machine.Pin.OUT, value=0)
         self.lit_until = 0
         self.wlan = network.WLAN(network.STA_IF)
+        self.i2c = machine.I2C(0, scl=machine.Pin(board.I2C_SCL), sda=machine.Pin(board.I2C_SDA), freq=400000)
+        found = self.i2c.scan()
+        self.sht = SHT40(self.i2c) if SHT40.ADDR in found else None
 
     def ticks_ms(self):
         return time.ticks_ms()
@@ -100,6 +118,21 @@ class ESP32Hal:
 
     def battery_level(self):
         return 4
+
+    def sensors(self):
+        out = {}
+        if self.sht:
+            out['temperature'], out['humidity'] = self.sht.read()
+        return out
+
+    def voice_start(self):
+        return False
+
+    def voice_stop(self, url, params, token):
+        pass
+
+    def voice_poll(self):
+        return {'error': 'Microfono non ancora collegato'}
 
     def random(self, n):
         return random.getrandbits(16) % n

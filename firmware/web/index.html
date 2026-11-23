@@ -3,70 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Auri-3310 Simulator</title>
+<title>AurI-3310 Simulator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <style>
-  :root { --mm: 3.78px; --bg: #1b1e22; --fg: #d7dadd; --muted: #8a9096; }
+  :root { --mm: 3.78px; --bg: #0f1115; --panel: rgba(255,255,255,.04); --line: rgba(255,255,255,.08); --fg: #e6e8eb; --muted: #8b929b; --accent: #9fe06a; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; display: flex; gap: 40px; justify-content: center; align-items: flex-start; padding: 32px 16px; flex-wrap: wrap; }
-  #phone { position: relative; width: calc(var(--mm) * 49.8); height: calc(var(--mm) * 116.8); user-select: none; -webkit-user-select: none; touch-action: none; }
+  html, body { height: 100%; }
+  body { margin: 0; background: radial-gradient(1200px 700px at 30% 20%, #1a2030 0%, var(--bg) 60%); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; gap: 48px; justify-content: center; align-items: center; padding: 32px 16px; flex-wrap: wrap; }
+  #phone { position: relative; width: calc(var(--mm) * 49.8); height: calc(var(--mm) * 116.8); user-select: none; -webkit-user-select: none; touch-action: none; filter: drop-shadow(0 calc(var(--mm) * 3) calc(var(--mm) * 5) rgba(0,0,0,.55)); }
   #phone.shake { animation: shake .25s linear; }
   @keyframes shake { 25% { transform: translateX(calc(var(--mm) * -0.6)); } 75% { transform: translateX(calc(var(--mm) * 0.6)); } }
   #phone svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  #lcd, #glass { position: absolute; left: 15.24%; top: 26.01%; width: 68.46%; height: 21.01%; border-radius: 1.2% / 2%; }
-  #glass { pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.04) 28%, rgba(255,255,255,0) 45%), radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,.28) 100%); box-shadow: inset 0 calc(var(--mm) * .6) calc(var(--mm) * .8) rgba(0,0,0,.55); }
+  #lcd, #glass { position: absolute; left: 15.24%; top: 26.01%; width: 68.46%; height: 21.01%; border-radius: 3.1% / 4.3%; }
+  #glass { pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.03) 30%, rgba(255,255,255,0) 46%), radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 62%, rgba(0,0,0,.26) 100%); box-shadow: inset 0 calc(var(--mm) * .6) calc(var(--mm) * .8) rgba(0,0,0,.5); }
   .key { cursor: pointer; }
-  .key .hit { fill: #000; fill-opacity: 0; transition: fill-opacity .05s; }
+  .key .hit { fill: #000; fill-opacity: 0; transition: fill-opacity .06s; }
   .key.down .hit { fill-opacity: .28; }
-  .glow .hit { fill: #9fe06a; fill-opacity: .10; }
-  .glow.down .hit { fill: #000; fill-opacity: .28; }
-  aside { max-width: 360px; }
-  h1 { font-size: 18px; margin: 0 0 8px; }
-  p { margin: 6px 0; color: var(--muted); }
-  kbd { background: #2c3137; border-radius: 4px; padding: 1px 5px; color: var(--fg); }
-  #status { color: #9fe06a; }
-  #err { color: #ff8a80; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
-  fieldset { border: 1px solid #343a40; border-radius: 8px; margin: 14px 0; padding: 10px 12px; }
-  #card { width: calc(var(--mm) * 85.6); height: calc(var(--mm) * 53.98); border: 2px dashed #9fe06a; border-radius: calc(var(--mm) * 3.2); margin: 8px 0; display: none; }
+  .glow .key .hit { fill: #9fe06a; fill-opacity: .09; }
+  .glow .key.down .hit { fill: #000; fill-opacity: .28; }
+  aside { width: 340px; max-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; backdrop-filter: blur(8px); }
+  h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; letter-spacing: .2px; }
+  h1 small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(159,224,106,.1); color: var(--accent); margin: 6px 0 12px; }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  p { margin: 8px 0; color: var(--muted); }
+  kbd { background: rgba(255,255,255,.08); border-radius: 5px; padding: 1px 6px; color: var(--fg); font: 12px ui-monospace, monospace; }
+  #err { color: #ff8a80; white-space: pre-wrap; font: 12px ui-monospace, monospace; }
+  details { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
+  summary { cursor: pointer; color: var(--fg); list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: " +"; color: var(--muted); }
+  details[open] summary::after { content: " -"; }
+  #card { width: calc(var(--mm) * 85.6); height: calc(var(--mm) * 53.98); border: 2px dashed var(--accent); border-radius: calc(var(--mm) * 3.2); margin: 8px 0; display: none; }
   #card.on { display: block; }
-  input[type=range] { width: 100%; }
-  label { display: block; margin: 6px 0; }
+  fieldset { border: 0; border-top: 1px solid var(--line); margin: 14px 0 0; padding: 10px 0 0; }
+  legend { color: var(--fg); padding: 0; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  input[type=checkbox] { accent-color: var(--accent); }
+  label { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: var(--fg); }
+  #view3d { display: none; position: absolute; z-index: 0; touch-action: none; }
+  aside { position: relative; z-index: 1; }
+  body.d3 #view3d { display: block; }
+  body.d3 #phone { visibility: hidden; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .row button, #btn3d { background: rgba(255,255,255,.08); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font: inherit; cursor: pointer; }
+  #ctl3d { visibility: hidden; }
+  body.d3 #ctl3d { visibility: visible; }
 </style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
 <div id="phone">
   <svg viewBox="0 0 853 1999" xmlns="http://www.w3.org/2000/svg">
     <image href="cover.webp" width="853" height="1999"/>
     <rect x="283" y="381" width="270" height="61" rx="2" fill="#07090f" stroke="#2c3346" stroke-width="3"/>
-    <text x="418" y="429" font-size="52" text-anchor="middle" textLength="200" lengthAdjust="spacingAndGlyphs" fill="#eef0f4" font-family="'Archivo Black', 'Arial Black', Arial, sans-serif">AURI</text>
+    <text x="418" y="429" font-size="52" text-anchor="middle" textLength="200" lengthAdjust="spacingAndGlyphs" fill="#eef0f4" font-family="'Archivo Black', 'Arial Black', Arial, sans-serif">A<tspan font-size="36">ur</tspan>I</text>
     <g id="keys"></g>
   </svg>
   <canvas id="lcd"></canvas>
   <div id="glass"></div>
 </div>
+<div id="view3d"></div>
 
 <aside>
-  <h1>Auri-3310 Simulator</h1>
-  <p id="status">Caricamento MicroPython...</p>
-  <p>Questa pagina esegue i file Python di <code>firmware/</code> in MicroPython compilato per il browser. Sono gli stessi file che girano sul telefono.</p>
-  <p>Tastiera: <kbd>&uarr;</kbd> <kbd>&darr;</kbd>, <kbd>Invio</kbd> = Navi, <kbd>Backspace</kbd> = C, <kbd>0</kbd>-<kbd>9</kbd>, <kbd>*</kbd> <kbd>#</kbd></p>
-  <fieldset>
-    <label><input type="checkbox" id="calib"> Taratura scala 1:1</label>
-    <p>Appoggia una carta di credito sullo schermo e muovi il cursore finché coincide con il riquadro.</p>
+  <h1>AurI-3310 <small>simulatore</small></h1>
+  <div class="pill" id="status">Caricamento MicroPython...</div>
+  <p>Gira lo stesso codice Python del telefono, in MicroPython compilato per il browser.</p>
+  <p><kbd>&uarr;</kbd> <kbd>&darr;</kbd> scorri &middot; <kbd>Invio</kbd> Navi &middot; <kbd>Backspace</kbd> C &middot; <kbd>0</kbd>-<kbd>9</kbd> <kbd>*</kbd> <kbd>#</kbd></p>
+  <label><input type="checkbox" id="ghost" checked> Persistenza LCD</label>
+  <button id="btn3d">3D</button>
+  <div id="ctl3d">
+    <div class="row"><button data-view="fronte">Fronte</button><button data-view="retro">Retro</button><button data-view="sinistra">Sinistra</button><button data-view="destra">Destra</button><button data-view="alto">Alto</button><button data-view="sotto">Sotto</button></div>
+    <label>Smonta <input type="range" id="explode" min="0" max="1" step="0.01" value="0"></label>
+  </div>
+  <details>
+    <summary>Scala reale 1:1</summary>
+    <label><input type="checkbox" id="calib"> Mostra la carta di riferimento</label>
+    <p>Appoggia una carta di credito sullo schermo e regola finché coincide.</p>
     <input type="range" id="scale" min="2" max="8" step="0.01">
     <div id="card"></div>
-    <label><input type="checkbox" id="ghost" checked> Persistenza LCD (circa 120 ms)</label>
-  </fieldset>
-  <p>Telefono ricostruito dalla scansione 1:1 della cover (49,8 x 116,8 mm). Area LCD 34,1 x 24,5 mm: sul 3310 i pixel non sono quadrati (0,41 x 0,51 mm).</p>
+    <p>Cover 49,8 x 116,8 mm. LCD 34,1 x 24,5 mm, pixel 0,41 x 0,51 mm.</p>
+  </details>
   <div id="err"></div>
 </aside>
 
+<script src="auri-io.js"></script>
 <script type="module">
 const MP_URL = 'https://cdn.jsdelivr.net/npm/@micropython/micropython-webassembly-pyscript@1.29.0-6/micropython.mjs';
 const FILES = [
-  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py',
-  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py',
+  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py',
+  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py', 'apps/sensori.py', 'apps/assistente.py', 'apps/impostazioni.py',
   'hal/__init__.py', 'hal/web.py', 'config.example.json',
 ];
 const KEYS = [
@@ -101,7 +128,7 @@ for (const [k, kind, ...v] of KEYS) {
   $('keys').appendChild(g);
 }
 
-let kx = 4, ky = 5;
+let kx = 4, ky = 5, dirty = true;
 let mmPx = parseFloat(store.get('auri.mm', '')) || 96 / 25.4;
 function applyScale() {
   document.documentElement.style.setProperty('--mm', mmPx + 'px');
@@ -110,6 +137,7 @@ function applyScale() {
   kx = Math.max(3, Math.round(r.width * devicePixelRatio / W));
   ky = Math.max(3, Math.round(r.height * devicePixelRatio / H));
   lcd.width = W * kx; lcd.height = H * ky;
+  dirty = true;
 }
 $('scale').addEventListener('input', e => { mmPx = parseFloat(e.target.value); store.set('auri.mm', mmPx); applyScale(); });
 $('calib').addEventListener('change', e => $('card').classList.toggle('on', e.target.checked));
@@ -124,6 +152,7 @@ window.auriShow = hex => {
     const v = parseInt(hex.substr(b * 2, 2), 16), x = b % W, bank = (b / W) | 0;
     for (let i = 0; i < 8; i++) target[(bank * 8 + i) * W + x] = (v >> i) & 1;
   }
+  dirty = true;
 };
 window.auriLight = on => { litUntil = on ? performance.now() + 15000 : 0; };
 window.auriTime = () => {
@@ -157,10 +186,13 @@ window.auriRequest = (method, url, body, token) => {
   } catch (e) { return 'ERR ' + (e.message || e); }
 };
 
+let wasLit = null;
 function draw(now) {
   const dt = now - lastFrame; lastFrame = now;
-  const a = $('ghost').checked ? 1 - Math.exp(-dt / TAU) : 1;
   const lit = now < litUntil;
+  if (lit !== wasLit) { wasLit = lit; dirty = true; phone.classList.toggle('glow', lit); }
+  if (!dirty) return requestAnimationFrame(draw);
+  const a = $('ghost').checked ? 1 - Math.exp(-dt / TAU) : 1;
   const bg = lit ? BG_LIT : BG_DARK, fg = lit ? FG_LIT : FG_DARK;
   const w = lcd.width, h = lcd.height;
   const grad = ctx.createRadialGradient(w * .5, h * .55, h * .1, w * .5, h * .55, w * .65);
@@ -170,18 +202,21 @@ function draw(now) {
   ctx.fillRect(0, 0, w, h);
   const dw = Math.max(1, Math.round(kx * .86)), dh = Math.max(1, Math.round(ky * .88));
   const sx = Math.max(1, kx * .3), sy = Math.max(1, ky * .3);
-  // LCD segments float above the reflector: each dark pixel casts a faint offset shadow.
+  let moving = false;
+  // Shadows first in one pass, then pixels: two fillStyle changes per level instead of per pixel.
   for (let i = 0; i < W * H; i++) {
-    level[i] += (target[i] - level[i]) * a;
+    const d = target[i] - level[i];
+    if (d) { level[i] = Math.abs(d) < 0.01 ? target[i] : level[i] + d * a; moving = moving || level[i] !== target[i]; }
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  for (let i = 0; i < W * H; i++) if (level[i] > 0.5) ctx.fillRect((i % W) * kx + sx, ((i / W) | 0) * ky + sy, dw, dh);
+  for (let i = 0; i < W * H; i++) {
     const v = level[i];
     if (v < 0.02) continue;
-    const x = (i % W) * kx, y = ((i / W) | 0) * ky;
-    ctx.fillStyle = `rgba(0,0,0,${0.13 * v})`;
-    ctx.fillRect(x + sx, y + sy, dw, dh);
-    ctx.fillStyle = `rgba(${fg},${0.92 * v})`;
-    ctx.fillRect(x, y, dw, dh);
+    ctx.fillStyle = v > 0.98 ? `rgb(${fg})` : `rgba(${fg},${0.92 * v})`;
+    ctx.fillRect((i % W) * kx, ((i / W) | 0) * ky, dw, dh);
   }
-  document.querySelectorAll('.key').forEach(el => el.classList.toggle('glow', lit));
+  dirty = moving;
   requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
@@ -190,6 +225,8 @@ let mp, ready = false;
 const py = code => { try { mp.runPython(code); } catch (e) { $('err').textContent = String(e.message || e); } };
 const press = k => ready && py(`hal.press('${k}')`);
 const release = k => ready && py(`hal.release('${k}')`);
+window.auriPress = press;
+window.auriRelease = release;
 
 document.querySelectorAll('.key').forEach(el => {
   const k = el.dataset.key;
@@ -236,13 +273,27 @@ s.push(Home(s))
 hal.light(1)
 `);
     ready = true;
-    $('status').textContent = 'Auri OS in esecuzione (MicroPython WebAssembly 1.29)';
+    $('status').textContent = 'AurI OS in esecuzione (MicroPython WebAssembly 1.29)';
     setInterval(() => py('s.step()'), 20);
   } catch (e) {
     $('status').textContent = 'Errore di avvio';
     $('err').textContent = String(e.stack || e);
   }
 })();
+</script>
+<script type="module">
+let p3;
+document.getElementById('btn3d').addEventListener('click', async () => {
+  const on = document.body.classList.toggle('d3');
+  if (on && !p3) {
+    const { createPhone3D } = await import('./phone3d.js');
+    p3 = createPhone3D(document.getElementById('view3d'), { press: k => window.auriPress(k), release: k => window.auriRelease(k) });
+    document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => p3.view(b.dataset.view)));
+    document.getElementById('explode').addEventListener('input', e => p3.setExplode(parseFloat(e.target.value)));
+  }
+  p3?.show(on);
+  document.getElementById('btn3d').textContent = on ? '2D' : '3D';
+});
 </script>
 </body>
 </html>

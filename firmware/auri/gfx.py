@@ -50,9 +50,14 @@ class Canvas:
         if o == 0xB7:
             self.fill_rect(x + 2 * s, y + 3 * s, s, s, c)
             return
-        if o < 32 or o > 126:
+        if o > 126:
+            o = ord(FOLD.get(ch, '?'))
+        elif o < 32:
             o = 63
         base = (o - 32) * font.W
+        if s == 2:
+            self._char2x(base, x, y, c)
+            return
         for col in range(font.W):
             bits = font.FONT[base + col]
             for row in range(font.H):
@@ -61,6 +66,32 @@ class Canvas:
                         self.pixel(x + col, y + row, c)
                     else:
                         self.fill_rect(x + col * s, y + row * s, s, s, c)
+
+    def _char2x(self, base, x, y, c):
+        # Scale2x: doubles the glyph but rounds diagonal steps, so big digits look smooth instead of blocky.
+        F = font.FONT
+
+        def px(i, j):
+            if 0 <= i < font.W and 0 <= j < font.H:
+                return (F[base + i] >> j) & 1
+            return 0
+        for i in range(font.W):
+            for j in range(font.H):
+                p = px(i, j)
+                a, b, d, e = px(i, j - 1), px(i + 1, j), px(i - 1, j), px(i, j + 1)
+                if b != d and a != e:
+                    q = (d if a == d else p, b if a == b else p, d if d == e else p, b if e == b else p)
+                else:
+                    q = (p, p, p, p)
+                for k in range(4):
+                    if q[k]:
+                        self.pixel(x + i * 2 + (k & 1), y + j * 2 + (k >> 1), c)
+
+    def round_fill(self, x, y, w, h, c=1):
+        self.fill_rect(x, y, w, h, c)
+        bg = 0 if c else 1
+        for cx, cy in ((x, y), (x + w - 1, y), (x, y + h - 1), (x + w - 1, y + h - 1)):
+            self.pixel(cx, cy, bg)
 
     def text(self, s, x, y, c=1, scale=1):
         for ch in s:
@@ -77,6 +108,27 @@ class Canvas:
             for i, ch in enumerate(r):
                 if ch == '#':
                     self.pixel(x + i, y + j, c)
+
+
+    def logo(self, x, y, c=1):
+        # "AurI": full-size A and I, a smaller "ur" sitting on the same baseline.
+        self.char('A', x, y, c)
+        self.icon(('#.#', '#.#', '#.#', '.##'), x + 6, y + 3, c)
+        self.icon(('#.##', '##..', '#...', '#...'), x + 10, y + 3, c)
+        self.char('I', x + 13, y, c)
+
+    def logo_center(self, y, c=1):
+        self.logo((W - 18) // 2, y, c)
+
+
+# Accented letters fold to their base letter: the 5x8 font is ASCII only.
+FOLD = {}
+for _base, _acc in (('a', 'àáâãäå'), ('e', 'èéêë'), ('i', 'ìíîï'), ('o', 'òóôõö'), ('u', 'ùúûü'),
+                    ('A', 'ÀÁÂÃÄÅ'), ('E', 'ÈÉÊË'), ('I', 'ÌÍÎÏ'), ('O', 'ÒÓÔÕÖ'), ('U', 'ÙÚÛÜ'),
+                    ('c', 'ç'), ('C', 'Ç'), ('n', 'ñ'), ('N', 'Ñ'), ('s', 'ß'), ("'", '’‘'), ('"', '“”'),
+                    ('-', '–—'), ('o', '°')):
+    for _ch in _acc:
+        FOLD[_ch] = _base
 
 
 def text_width(s, scale=1):

@@ -68,12 +68,12 @@ const sp = () => new Paragraph({ children: [] });
 
 const body = [
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 600 }, children: [new TextRun({ text: 'PROGETTO OPEN HARDWARE', size: 20, color: '556B2F', bold: true })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Auri-3310', size: 64, bold: true })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'AurI-3310', size: 64, bold: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [new TextRun({ text: 'Un Nokia 3310 originale con cervello ESP32-S3, Wi-Fi, Home Assistant e una shell Claude in tasca', size: 26, italics: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Piano Maestro v2.0  |  23 novembre 2026  |  Autore: Luigi Califano', size: 20 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [new TextRun({ text: 'Sostituisce "3310OS Piano Maestro v1.1". Le parti valide sono state mantenute, le decisioni aperte sono state chiuse.', size: 18, color: '666666' })] }),
   ...img('13_panoramica_smontaggio.jpg', 'il telefono smontato: scheda madre (lato tasti), telaio UI con altoparlante e connettore LCD, fondello.', 360, 560),
-  box('OBIETTIVO', 'Sostituire la scheda madre di un Nokia 3310 originale (NHM-5NX) con una scheda nuova basata su ESP32-S3, riusando scocca, display, tastiera, altoparlante e vibrazione. Il telefono diventa un terminale smart: sistema operativo Auri, giochi, orologio, controllo Home Assistant e una shell conversazionale verso Claude. La scheda originale resta intatta e conservata.'),
+  box('OBIETTIVO', 'Sostituire la scheda madre di un Nokia 3310 originale (NHM-5NX) con una scheda nuova basata su ESP32-S3, riusando scocca, display, tastiera, altoparlante e vibrazione. Il telefono diventa un terminale smart: sistema operativo AurI, giochi, orologio, controllo Home Assistant e una shell conversazionale verso Claude. La scheda originale resta intatta e conservata.'),
   new Paragraph({ children: [new PageBreak()] }),
 
   H1('1. Cosa cambia rispetto alla v1.1'),
@@ -84,7 +84,7 @@ const body = [
     ['Display', 'Pinout e tensioni sconosciuti', 'PCD8544 84x48, 8 contatti a molla, pinout documentato dalla community. Si verifica con un solo test a 3,3 V'],
     ['Batteria', 'BLC-1 da ispezionare', 'BLC-1 conservata come reperto. Si usa una cella Li-ion nuova compatibile'],
     ['Fotocamera', 'Requisito della prima release', 'Spostata alla v2 hardware: ingombro 5,85 mm e rischio alto'],
-    ['Software', 'Solo firmware ESP-IDF in C', 'MicroPython su telefono e PC + Auri Bridge (shell Claude) su Raspberry Pi'],
+    ['Software', 'Solo firmware ESP-IDF in C', 'MicroPython su telefono e PC + AurI Bridge (shell Claude) su Raspberry Pi'],
     ['Metodo', '10 fasi con gate', 'Si sviluppa in parallelo: software subito sul simulatore, hardware al banco, PCB dopo la scansione 1:1'],
   ], [2, 4, 5]),
 
@@ -129,6 +129,10 @@ const body = [
   ...img('04_pcb_macro_ub4_12.jpg', 'macro: UB4_12, 9854424, MOD +1-3.', 300, 480),
   ...img('01_batteria_blc1.jpg', 'batteria BLC-1 Li-ion 3,6 V: reperto da conservare, non da riusare.', 260, 420),
   ...img('09_frontale_display.jpg', 'frontale con display e guida luce tastiera.', 280, 460),
+  H2('3.5 I pezzi originali che restano'),
+  P('Scansione a 600 dpi di tutti i componenti affiancati. Cover, display, tappetino tasti, altoparlante, vibrazione e microfono tornano nel telefono; scheda madre e batteria BLC-1 restano reperti.'),
+  ...img('15_componenti_fronte.jpg', 'tutti i componenti, lato esterno: cover, guscio frontale, tappetino, batteria, scheda madre, telaio UI, fondello.', 480, 320),
+  ...img('16_componenti_retro.jpg', 'tutti i componenti, lato interno: stessi pezzi girati, con display e altoparlante sul telaio UI.', 480, 320),
 
   H1('4. Architettura hardware'),
   table(['Blocco', 'Scelta', 'Motivo'], [
@@ -138,7 +142,7 @@ const body = [
     ['Tastiera', '23 anelli ridisegnati, matrice 5x5 su GPIO diretti', 'Niente expander, scansione con interrupt per il risveglio'],
     ['Retroilluminazione', '10 LED SMD 0603 verdi, driver a corrente costante PWM', 'Effetto originale'],
     ['Audio', 'Altoparlante originale + amplificatore I2S MAX98357A o PWM + MOSFET', 'Suonerie, bip, eventuale TTS'],
-    ['Microfono', 'MEMS I2S (ICS-43434) dietro il foro originale', 'Push-to-talk verso la shell Claude'],
+    ['Microfono', 'Capsula originale del 2000 con preamplificatore e ADC; MEMS I2S (ICS-43434) solo come piano B', 'Push-to-talk verso la shell Claude'],
     ['Vibrazione', 'Motore originale, MOSFET + diodo di ricircolo', ''],
     ['Batteria', 'Cella Li-ion nuova nel guscio BLC-1 o compatibile', 'La BLC-1 originale resta reperto'],
     ['Ricarica', 'BQ24072/TP4056-class + protezione + fuel gauge MAX17048', 'Percentuale batteria reale sul display'],
@@ -153,12 +157,12 @@ const body = [
 
   H1('5. Architettura software'),
   P('Il software si divide in tre parti, tutte nello stesso repository:'),
-  LI([B('firmware/'), ': Auri OS in MicroPython (v1.29+). Livello HAL (display, tastiera, audio, power) separato dalla UI, così lo stesso codice gira sul telefono e sul PC.']),
+  LI([B('firmware/'), ': AurI OS in MicroPython (v1.29+). Livello HAL (display, tastiera, audio, power) separato dalla UI, così lo stesso codice gira sul telefono e sul PC.']),
   LI([B('firmware/sim/'), ': simulatore PC in Python con tkinter, nessuna dipendenza. Esegue lo stesso codice del telefono e salva screenshot.']),
-  LI([B('bridge/'), ': Auri Bridge in Python, gira sul Raspberry Pi accanto a Home Assistant. Riceve richieste dal telefono e parla con Claude e con HA.']),
-  H2('5.1 Auri OS: funzioni'),
+  LI([B('bridge/'), ': AurI Bridge in Python, gira sul Raspberry Pi accanto a Home Assistant. Riceve richieste dal telefono e parla con Claude e con HA.']),
+  H2('5.1 AurI OS: funzioni'),
   table(['App', 'Descrizione'], [
-    ['Boot e home', 'Logo Auri, orologio NTP, icone Wi-Fi e batteria'],
+    ['Boot e home', 'Logo AurI, orologio NTP, icone Wi-Fi e batteria'],
     ['Claude', 'Shell conversazionale: input T9 o vocale, risposta a scorrimento, conferma azioni con il tasto Navi'],
     ['Casa', 'Stanze, luci, prese, scene, sensori da Home Assistant'],
     ['Giochi', 'Serpente e altri giochi originali in pixel art 84x48'],
@@ -181,10 +185,23 @@ const body = [
     ['MQTT auri/<id>/...', 'Eventi e telemetria (batteria, RSSI, tasti)'],
   ], [3, 5]),
 
+  H1('5bis. Sensori e voce'),
+  P("L'ESP32-S3 non misura l'ambiente: servono sensori I2C minuscoli, tutti sullo stesso bus (2 pin), circa 10 euro in tutto."),
+  table(['Funzione', 'Componente', 'Uso'], [
+    ['Temperatura e umidità', 'Sensirion SHT40 (1,5 x 1,5 mm)', 'Home, Home Assistant, avvisi. Vicino al foro del microfono, isolato da una fessura nella PCB'],
+    ['Pressione', 'Bosch BMP390', 'Meteo locale, altitudine'],
+    ['Movimento', 'LIS2DH12', 'Scuoti per sbloccare, capovolgi per silenziare, contapassi'],
+    ['Luce ambiente', 'VEML7700', 'Retroilluminazione automatica'],
+    ['Batteria', 'MAX17048', 'Percentuale reale'],
+  ], [3, 3, 5]),
+  P('I valori vengono inviati al bridge ogni 5 minuti e compaiono in Home Assistant come sensor.auri_3310_*.'),
+  H2('Voce'),
+  P("Tenendo premuto Navi nella console Claude si parla; al rilascio l'audio va al bridge, che lo trascrive con faster-whisper, lo passa a Claude Code e legge la risposta con Piper (voce italiana Paola). Tutto gira in locale tranne Claude. Il microfono previsto è la capsula originale del 3310 con un preamplificatore; un MEMS I2S resta come piano B."),
+  P('Il bridge e i modelli vocali stanno interamente nella cartella bridge/ (.venv e models): per rimuoverli basta cancellarle, per spostarli su un altro computer basta lanciare setup.sh o setup.ps1.'),
   H1('6. Roadmap'),
   table(['Fase', 'Contenuto', 'Hardware necessario', 'Uscita'], [
-    ['S0', 'Repo, simulatore, UI base, giochi, T9', 'Nessuno', 'Auri OS gira sul PC'],
-    ['S1', 'Auri Bridge + shell Claude nel simulatore', 'Raspberry Pi esistente', 'Conversazione dal simulatore'],
+    ['S0', 'Repo, simulatore, UI base, giochi, T9', 'Nessuno', 'AurI OS gira sul PC'],
+    ['S1', 'AurI Bridge + shell Claude nel simulatore', 'Raspberry Pi esistente', 'Conversazione dal simulatore'],
     ['H0', 'DevKit ESP32-S3 + display 5110 + tastierino', 'DevKit, display, pulsanti', 'Firmware reale al banco'],
     ['H1', 'Test LCD originale e altoparlante su breakout', 'Breakout stampata o pogo pin', 'Pinout LCD confermato'],
     ['M0', 'Scansione 600 dpi, outline DXF, misure Z', 'Scanner, calibro', 'Outline e mappa altezze'],
@@ -222,7 +239,7 @@ const body = [
 ];
 
 const doc = new Document({
-  creator: 'Luigi Califano', title: 'Auri-3310 Piano Maestro v2.0',
+  creator: 'Luigi Califano', title: 'AurI-3310 Piano Maestro v2.0',
   styles: {
     default: { document: { run: { font: 'Calibri', size: 22 } } },
     paragraphStyles: [
@@ -236,8 +253,8 @@ const doc = new Document({
   ] },
   sections: [{
     properties: { page: { margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } },
-    footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Auri-3310  |  Piano Maestro v2.0  |  pagina ', size: 16, color: '888888' }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: '888888' })] })] }) },
+    footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'AurI-3310  |  Piano Maestro v2.0  |  pagina ', size: 16, color: '888888' }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: '888888' })] })] }) },
     children: body,
   }],
 });
-Packer.toBuffer(doc).then(b => { fs.writeFileSync(path.join(ROOT, 'docs', 'Auri-3310_Piano_Maestro_v2_0.docx'), b); console.log('ok'); });
+Packer.toBuffer(doc).then(b => { fs.writeFileSync(path.join(ROOT, 'docs', 'AurI-3310_Piano_Maestro_v2_0.docx'), b); console.log('ok'); });

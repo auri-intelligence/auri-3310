@@ -1,5 +1,5 @@
 # Bench wiring: ESP32-S3-DevKitC-1 + Nokia 5110 breakout + 4x4 button matrix.
-# Will change when the real Auri-3310 board exists.
+# Will change when the real AurI-3310 board exists.
 LCD_SCLK = 12
 LCD_SDIN = 11
 LCD_DC = 9
@@ -18,5 +18,8 @@ KEYMAP = (
     ('7', '8', '9', 'c'),
     ('*', '0', '#', 'navi'),
 )
+
+I2C_SDA = 1
+I2C_SCL = 2
 
 TZ_OFFSET = 3600

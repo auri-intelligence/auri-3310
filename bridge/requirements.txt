@@ -1,0 +1,5 @@
+claude-agent-sdk
+# voice, optional
+faster-whisper
+piper-tts
+numpy

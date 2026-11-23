@@ -13,3 +13,10 @@ firmware/config.json
 firmware/.simdata/
 shots/
 docs/scans/cover.png
+bridge/config.json
+bridge/.venv/
+bridge/models/
+tools/video/.venv/
+tools/video/out/
+docs/scans/componenti fronte.png
+docs/scans/componenti retro.png

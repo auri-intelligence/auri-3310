@@ -2,8 +2,10 @@ from auri import keys
 from auri.ui import App, Menu, TextView, Confirm, header
 from auri.t9 import MultiTap
 from auri.gfx import W, H, wrap
+from auri import i18n
+from auri.i18n import t
 
-# Auri's own mascot: a tiny antenna robot.
+# AurI's own mascot: a tiny antenna robot.
 MASCOT = (
     '.....#.....',
     '..#######..',
@@ -16,7 +18,7 @@ MASCOT = (
 MODELS = (('Opus 5.5', 'claude-opus-5-5'), ('Sonnet 5.5', 'claude-sonnet-5-5'),
           ('Haiku 5.5', 'claude-haiku-5-5'), ('Fable 5.2', 'claude-fable-5-2'))
 EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
-PERMS = (('Chiedi sempre', 'default'), ('Accetta modifiche', 'acceptEdits'), ('Solo piano', 'plan'))
+PERMS = (('perm_ask', 'default'), ('perm_edits', 'acceptEdits'), ('perm_plan', 'plan'))
 DOT = '·'
 
 
@@ -37,11 +39,12 @@ class Claude(App):
         self.state = 'splash'
         self.scroll = 0
         self._blink = 0
+        self._navi = False
         try:
             cfg = sys.config
             self.info.update(sys.hal.request('GET', cfg['bridge_url'] + '/v1/info', None, cfg.get('token')))
         except Exception:
-            self.info['plan'] = 'offline'
+            self.info['plan'] = t('offline')
 
     def _save(self):
         self.sys.hal.save('claude', {'model': self.model, 'effort': self.effort, 'perm': self.perm,
@@ -60,7 +63,8 @@ class Claude(App):
             if self.input.text.strip():
                 self.state = 'send'
             else:
-                self.sys.push(self.options())
+                # Short press opens the options on release; holding it talks.
+                self._navi = True
         elif k == keys.C and not self.input.text:
             self.sys.pop()
         elif k == keys.UP:
@@ -72,14 +76,36 @@ class Claude(App):
             self.scroll = 0
 
     def on_long(self, k):
-        if k == keys.NAVI:
-            self.sys.push(self.options())
+        if k == keys.NAVI and self.state == 'chat' and not self.input.text:
+            # Voice belongs to the system-wide assistant, not to the console.
+            self._navi = False
+            self.sys.assistant(keys.NAVI)
         elif k == keys.C and not self.input.text:
             self.sys.home()
         else:
             self.input.long(k)
 
+    def on_up(self, k):
+        if k == keys.NAVI and self.state == 'listen':
+            self.state = 'voice'
+            self.sys.hal.voice_stop(self.sys.config['bridge_url'] + '/v1/voice', self._params(), self.sys.config.get('token'))
+        elif k == keys.NAVI and self._navi:
+            self._navi = False
+            self.sys.push(self.options())
+
+    def _params(self):
+        return {'session': self.session, 'model': MODELS[self.model][1], 'effort': self.effort,
+                'permission_mode': PERMS[self.perm][1], 'remote': self.remote, 'language': i18n.lang}
+
     def tick(self, now):
+        if self.state == 'voice':
+            r = self.sys.hal.voice_poll()
+            if r is None:
+                return False
+            if r.get('transcript'):
+                self.log.append(('>', r['transcript']))
+            self._handle(r)
+            return True
         if self.state == 'send':
             self.state = 'wait'
             self.log.append(('>', self.input.text))
@@ -97,14 +123,18 @@ class Claude(App):
 
     def _ask(self, path, body):
         cfg = self.sys.config
-        body.update({'session': self.session, 'model': MODELS[self.model][1], 'effort': self.effort,
-                     'permission_mode': PERMS[self.perm][1], 'remote': self.remote})
+        body.update(self._params())
         try:
             r = self.sys.hal.request('POST', cfg['bridge_url'] + path, body, cfg.get('token'))
         except Exception as e:
             self.state = 'chat'
-            self.log.append(('!', 'Bridge non raggiungibile'))
+            self.log.append(('!', t('bridge_down')))
             return
+        self._handle(r)
+
+    def _handle(self, r):
+        if r.get('error'):
+            self.log.append(('!', t('bridge_err')))
         self.session = r.get('session', self.session)
         self._save()
         self.state = 'chat'
@@ -115,7 +145,7 @@ class Claude(App):
         if c:
             def done(ok, cid=c.get('id')):
                 self._ask('/v1/confirm', {'id': cid, 'ok': ok})
-            self.sys.push(Confirm(self.sys, c.get('text', 'Procedo?'), done))
+            self.sys.push(Confirm(self.sys, c.get('text', t('proceed_q')), done))
 
     def options(self):
         sys = self.sys
@@ -150,17 +180,17 @@ class Claude(App):
             sys.pop()
 
         def show_info():
-            sys.push(TextView(sys, 'Stato', 'Claude Code %s\n%s %s %s\n%s\nSessione: %s\nRemote: %s' % (
+            sys.push(TextView(sys, t('status'), 'Claude Code %s\n%s %s %s\n%s\n%s: %s\nRemote: %s' % (
                 self.info['version'], MODELS[self.model][0], DOT, self.effort, self.info['plan'],
-                (self.session or 'nuova')[:8], 'on' if self.remote else 'off')))
+                t('session'), (self.session or t('new'))[:8], 'on' if self.remote else 'off')))
 
-        return Menu(sys, 'Opzioni', [
-            ('Modello', pick('Modello', [m[0] for m in MODELS], lambda: self.model, set_model)),
-            ('Effort', pick('Effort', EFFORTS, lambda: EFFORTS.index(self.effort), set_effort)),
-            ('Permessi', pick('Permessi', [p[0] for p in PERMS], lambda: self.perm, set_perm)),
+        return Menu(sys, t('options'), [
+            (t('model'), pick(t('model'), [m[0] for m in MODELS], lambda: self.model, set_model)),
+            (t('effort'), pick(t('effort'), EFFORTS, lambda: EFFORTS.index(self.effort), set_effort)),
+            (t('perms'), pick(t('perms'), [t(p[0]) for p in PERMS], lambda: self.perm, set_perm)),
             ('Remote ' + ('on' if self.remote else 'off'), toggle_remote),
-            ('Nuova sessione', new_session),
-            ('Stato', show_info),
+            (t('new_session'), new_session),
+            (t('status'), show_info),
         ])
 
     def draw(self, g):
@@ -177,18 +207,22 @@ class Claude(App):
             return
         g.icon(MASCOT, 0, 0)
         g.text('%s %s' % (MODELS[self.model][0].split()[0], self.effort[:3]), 14, 0)
-        g.hline(0, 8, W)
+        for x in range(0, W, 2):
+            g.pixel(x, 8)
         lines = []
         for who, text in self.log:
             for i, l in enumerate(wrap(text, 12)):
                 lines.append(((who if i == 0 else ' ') + ' ' + l))
-        if self.state == 'wait':
+        if self.state in ('wait', 'voice'):
             lines.append('* ...')
+        elif self.state == 'listen':
+            lines.append('* ' + t('listening'))
         body = 3
         end = max(0, len(lines) - self.scroll)
         for i, l in enumerate(lines[max(0, end - body):end]):
             g.text(l, 0, 10 + i * 9)
-        g.hline(0, H - 10, W)
+        for x in range(0, W, 2):
+            g.pixel(x, H - 10)
         inp = self.input.text
         shown = ('> ' + inp)[-13:]
         g.text(shown + ('_' if self._blink else ''), 0, H - 8)

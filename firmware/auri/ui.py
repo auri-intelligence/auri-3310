@@ -1,5 +1,6 @@
 from auri import keys
 from auri.gfx import W, H, wrap
+from auri.i18n import t
 
 ROW = 8
 VISIBLE = 4
@@ -27,19 +28,21 @@ class App:
 
 
 def header(g, title):
-    g.fill_rect(0, 0, W, 9, 1)
-    g.text_center(title[:14], 1, 0)
+    # Light header: title on the left, a dotted rule underneath instead of a solid black bar.
+    g.text(title[:13], 2, 0)
+    for x in range(0, W, 2):
+        g.pixel(x, 9)
 
 
 def softkey(g, label):
-    g.text_center(label, H - 8)
+    if label:
+        g.text_center(label, H - 8)
 
 
 class Menu(App):
-    soft = 'Scegli'
-
     def __init__(self, sys, title, items):
         super().__init__(sys)
+        self.soft = t('select')
         self.title = title
         self.items = items
         self.sel = 0
@@ -69,24 +72,27 @@ class Menu(App):
             j = self.top + i
             if j >= len(self.items):
                 break
-            y = 10 + i * 10
-            if j == self.sel:
-                g.fill_rect(0, y - 1, W, 10, 1)
-            g.text(self.items[j][0][:14], 1, y, 0 if j == self.sel else 1)
+            y = 11 + i * 10
+            sel = j == self.sel
+            if sel:
+                g.round_fill(0, y - 1, W - 3, 10, 1)
+            g.text(self.items[j][0][:13], 2, y, 0 if sel else 1)
         if len(self.items) > VISIBLE - 1:
-            h = max(3, 28 * (VISIBLE - 1) // len(self.items))
-            y = 10 + (28 - h) * self.sel // max(1, len(self.items) - 1)
-            g.vline(W - 1, y, h, 2)
+            for yy in range(11, 39, 3):
+                g.pixel(W - 1, yy)
+            h = max(4, 28 * (VISIBLE - 1) // len(self.items))
+            y = 11 + (28 - h) * self.sel // max(1, len(self.items) - 1)
+            g.vline(W - 1, y, h)
         softkey(g, self.soft)
 
 
 class TextView(App):
-    def __init__(self, sys, title, text, soft='Indietro'):
+    def __init__(self, sys, title, text, soft=None):
         super().__init__(sys)
         self.title = title
         self.lines = wrap(text)
         self.pos = 0
-        self.soft = soft
+        self.soft = soft or t('back')
 
     def on_key(self, k):
         if k == keys.UP:
@@ -99,9 +105,9 @@ class TextView(App):
     def draw(self, g):
         header(g, self.title)
         for i, line in enumerate(self.lines[self.pos:self.pos + 3]):
-            g.text(line, 0, 10 + i * 10)
+            g.text(line, 0, 11 + i * 9)
         if len(self.lines) > 3:
-            g.vline(W - 1, 10 + 28 * self.pos // len(self.lines), max(3, 28 * 3 // len(self.lines)), 2)
+            g.vline(W - 1, 11 + 27 * self.pos // len(self.lines), max(4, 27 * 3 // len(self.lines)))
         softkey(g, self.soft)
 
 
@@ -121,8 +127,11 @@ class Confirm(App):
             self.on_done(False)
 
     def draw(self, g):
-        header(g, 'Confermi?')
+        header(g, t('confirm_q'))
         for i, line in enumerate(self.lines[:3]):
-            g.text(line, 0, 10 + i * 10)
-        g.text('OK', 0, H - 8)
-        g.text('C=No', W - 23, H - 8)
+            g.text(line, 0, 11 + i * 9)
+        g.round_fill(0, H - 9, 20, 9, 1)
+        g.text('OK', 4, H - 8, 0)
+        no = 'C ' + t('no')
+        g.rect(W - len(no) * 6 - 4, H - 9, len(no) * 6 + 4, 9)
+        g.text(no, W - len(no) * 6 - 1, H - 8)

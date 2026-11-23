@@ -1,0 +1,18 @@
+{
+  "host": "0.0.0.0",
+  "port": 8310,
+  "token": "",
+  "cwd": "~",
+  "plan": "Claude Pro",
+  "gemini_key_env": "GEMINI_API_KEY",
+  "gemini_model": "gemini-4-hydrogen",
+  "ha_url": "http://homeassistant.local:8123",
+  "ha_token_env": "HA_TOKEN",
+  "entities": [
+    "light.soggiorno",
+    "switch.presa_tv"
+  ],
+  "stt_model": "small",
+  "language": "it",
+  "piper_voice": "models/it/it_IT/paola/medium/it_IT-paola-medium.onnx"
+}

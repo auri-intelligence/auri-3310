@@ -1,18 +1,18 @@
-# Auri-3310
+# AurI-3310
 
 [English](README.md) | Italiano
 
 Avevo un Nokia 3310 in un cassetto. Funzionava ancora, come tutti i 3310. Invece di lasciarlo lì ho deciso di aprirlo e dargli un cervello nuovo.
 
-L'idea è semplice da dire e un po' meno da fare: togliere la scheda madre originale e metterne al suo posto una progettata da zero, con un ESP32-S3. Scocca, display, tasti, altoparlante e vibrazione restano quelli del 2000. Il telefono si accende, si collega al Wi-Fi, controlla casa tramite Home Assistant e, soprattutto, ha dentro una shell con cui parlare con Claude.
+L'idea è semplice da dire e un po' meno da fare: togliere la scheda madre originale e metterne al suo posto una progettata da zero, con un ESP32-S3. Scocca, display, tasti, altoparlante, vibrazione e, se passa i test, anche il microfono restano quelli del 2000. Il telefono si accende, si collega al Wi-Fi, controlla casa tramite Home Assistant e, soprattutto, ha dentro una shell con cui parlare con Claude.
 
 ![Il 3310 smontato](docs/photos/13_panoramica_smontaggio.jpg)
 
 ## A che punto siamo
 
-Il telefono è smontato e fotografato. Ho studiato la scheda e scritto il [piano di progetto](docs/Auri-3310_Piano_Maestro_v2_0.docx). Il software è partito: Auri OS è scritto in MicroPython e gira già in un simulatore sul PC, con menu, scrittura T9 e il primo gioco. Le scansioni 1:1 della scheda sono in `docs/scans`.
+Il telefono è smontato e fotografato. Ho studiato la scheda e scritto il [piano di progetto](docs/AurI-3310_Piano_Maestro_v2_0.docx). Il software è partito: AurI OS è scritto in MicroPython e gira già in un simulatore sul PC, con menu, scrittura T9 e il primo gioco. Le scansioni 1:1 della scheda sono in `docs/scans`.
 
-![Auri OS nel simulatore](docs/screenshots/1_home.png)
+![AurI OS nel simulatore](docs/screenshots/1_home.png)
 
 Per provarlo serve solo Python 3:
 
@@ -35,24 +35,34 @@ Un paio di cose mi hanno reso la vita molto più facile del previsto.
 
 La scheda è revisione `UB4_12`, codice `9854424`, modello `NHM-5NX`. La scheda originale non viene modificata: la conservo intera.
 
+## I pezzi originali che restano
+
+Ho messo tutti i pezzi sullo scanner, davanti e dietro. Cover, display, tappetino dei tasti, altoparlante, vibrazione e microfono sono quelli che torneranno dentro il telefono. Nella foto ci sono anche la vecchia scheda madre e la batteria BLC-1, ma ormai sono ricordi: non verranno più alimentate.
+
+![Tutti i pezzi del 3310, davanti](docs/photos/15_componenti_fronte.jpg)
+
+![Tutti i pezzi del 3310, dietro](docs/photos/16_componenti_retro.jpg)
+
 ## Cosa farà
 
-Un piccolo sistema operativo, Auri OS, pensato per un display da 84x48 pixel: orologio, menu, scrittura T9, qualche gioco (sì, anche un serpente, fatto da me).
+Un piccolo sistema operativo, AurI OS, pensato per un display da 84x48 pixel: orologio, menu, scrittura T9, qualche gioco (sì, anche un serpente, fatto da me).
 
 Un'app per la casa: luci, prese, scene e sensori di Home Assistant, dal tastierino.
 
-E la parte che mi diverte di più: **la shell Claude**. Scrivi in T9, oppure tieni premuto il tasto grande sotto lo schermo e parli. Il telefono manda la richiesta a un piccolo server sul Raspberry Pi di casa, che chiama Claude e gli permette di usare solo gli strumenti che ho deciso io. Quando Claude vuole fare qualcosa, per esempio spegnere le luci o controllare un server, il telefono me lo chiede: il tasto grande conferma, C annulla.
+Un assistente tutto suo, **AurI**: tieni premuto il tasto di accensione (o il tasto grande nella schermata iniziale), chiedi qualcosa a voce e ti risponde in una frase o due, dall'altoparlante. Dietro c'è Google Gemini con il piano gratuito, e può accendere le luci che ho autorizzato. È la voce veloce, di tutti i giorni, del telefono.
+
+E la parte che mi diverte di più: **la shell Claude**, un'app a parte con la sua voce nel menu. Scrivi in T9, oppure tieni premuto il tasto grande dentro l'app e parli. Il telefono manda la richiesta a un piccolo server sul Raspberry Pi di casa, che chiama Claude e gli permette di usare solo gli strumenti che ho deciso io. Quando Claude vuole fare qualcosa, per esempio spegnere le luci o controllare un server, il telefono me lo chiede: il tasto grande conferma, C annulla.
 
 ```
  Nokia 3310            Raspberry Pi             fuori
- ESP32-S3  ---Wi-Fi--> Auri Bridge  ----------> Claude
- Auri OS   <---------  (Python)     ----------> Home Assistant
+ ESP32-S3  ---Wi-Fi--> AurI Bridge  ----------> Claude, Gemini
+ AurI OS   <---------  (Python)     ----------> Home Assistant
 ```
 
 ## Com'è organizzato
 
 ```
-firmware/   Auri OS in MicroPython, più il simulatore per PC
+firmware/   AurI OS in MicroPython, più il simulatore per PC
 bridge/     il server sul Raspberry Pi
 hardware/   schema e PCB in KiCad
 docs/       piano di progetto, foto, scansioni

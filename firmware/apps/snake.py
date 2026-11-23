@@ -1,6 +1,7 @@
 from auri import keys
 from auri.ui import App, header
 from auri.gfx import W
+from auri.i18n import t
 
 CELL = 3
 COLS = W // CELL
@@ -72,10 +73,10 @@ class Snake(App):
 
     def draw(self, g):
         if self.dead:
-            header(g, 'Game over')
-            g.text_center('Punti: %d' % self.score, 14)
-            g.text_center('Record: %d' % self.best, 24)
-            g.text_center('OK = ancora', 40)
+            header(g, t('game_over'))
+            g.text_center('%s: %d' % (t('points'), self.score), 14)
+            g.text_center('%s: %d' % (t('record'), self.best), 24)
+            g.text_center(t('again'), 40)
             return
         g.text('%04d' % self.score, 0, 0)
         g.text('R%d' % self.best, W - 6 * len('R%d' % self.best), 0)

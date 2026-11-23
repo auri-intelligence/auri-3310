@@ -1,4 +1,4 @@
-"""Auri OS simulator.
+"""AurI OS simulator.
 
   python sim.py                          opens the window
   python sim.py --shot out.png --keys "navi,down,navi" [--time 12:34]
@@ -72,7 +72,7 @@ def window():
     s.push(Home(s))
 
     root = tk.Tk()
-    root.title('Auri-3310')
+    root.title('AurI-3310')
     root.configure(bg='#2b2f33')
     root.resizable(False, False)
     lcd = tk.Canvas(root, width=W * SCALE, height=H * SCALE, highlightthickness=8, highlightbackground='#c9ccce', bg='black')
