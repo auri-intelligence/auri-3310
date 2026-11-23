@@ -1,0 +1,72 @@
+# Hardware layer for the browser simulator (MicroPython WebAssembly). The JS side lives in web/index.html.
+import js
+import json
+import time
+import ubinascii
+
+
+class WebHal:
+    def __init__(self):
+        self.queue = []
+
+    def ticks_ms(self):
+        return time.ticks_ms()
+
+    def localtime(self):
+        return tuple(int(v) for v in str(js.auriTime()).split(','))
+
+    def events(self):
+        ev, self.queue = self.queue, []
+        return ev
+
+    def press(self, k):
+        self.queue.append(('down', k))
+
+    def release(self, k):
+        self.queue.append(('up', k))
+
+    def show(self, buf):
+        js.auriShow(ubinascii.hexlify(buf).decode())
+
+    def light(self, on):
+        js.auriLight(1 if on else 0)
+
+    def vibrate(self, ms):
+        js.auriVibrate(ms)
+
+    def beep(self, freq, ms):
+        js.auriBeep(freq, ms)
+
+    def wifi_level(self):
+        return 4
+
+    def battery_level(self):
+        return 4
+
+    def random(self, n):
+        return int(js.Math.random() * n)
+
+    def sleep_ms(self, ms):
+        pass
+
+    def running(self):
+        return True
+
+    def request(self, method, url, body=None, token=None):
+        r = js.auriRequest(method, url, json.dumps(body) if body is not None else '', token or '')
+        r = str(r)
+        if r.startswith('ERR '):
+            raise OSError(r[4:])
+        return json.loads(r)
+
+    def load(self, name, default):
+        v = str(js.auriLoad(name))
+        if not v:
+            return default
+        try:
+            return json.loads(v)
+        except ValueError:
+            return default
+
+    def save(self, name, obj):
+        js.auriSave(name, json.dumps(obj))

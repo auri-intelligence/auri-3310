@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auri-3310 Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+  :root { --mm: 3.78px; --bg: #1b1e22; --fg: #d7dadd; --muted: #8a9096; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; display: flex; gap: 40px; justify-content: center; align-items: flex-start; padding: 32px 16px; flex-wrap: wrap; }
+  #phone { position: relative; width: calc(var(--mm) * 49.8); height: calc(var(--mm) * 116.8); user-select: none; -webkit-user-select: none; touch-action: none; }
+  #phone.shake { animation: shake .25s linear; }
+  @keyframes shake { 25% { transform: translateX(calc(var(--mm) * -0.6)); } 75% { transform: translateX(calc(var(--mm) * 0.6)); } }
+  #phone svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  #lcd, #glass { position: absolute; left: 15.24%; top: 26.01%; width: 68.46%; height: 21.01%; border-radius: 1.2% / 2%; }
+  #glass { pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.04) 28%, rgba(255,255,255,0) 45%), radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,.28) 100%); box-shadow: inset 0 calc(var(--mm) * .6) calc(var(--mm) * .8) rgba(0,0,0,.55); }
+  .key { cursor: pointer; }
+  .key .hit { fill: #000; fill-opacity: 0; transition: fill-opacity .05s; }
+  .key.down .hit { fill-opacity: .28; }
+  .glow .hit { fill: #9fe06a; fill-opacity: .10; }
+  .glow.down .hit { fill: #000; fill-opacity: .28; }
+  aside { max-width: 360px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  p { margin: 6px 0; color: var(--muted); }
+  kbd { background: #2c3137; border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+  #status { color: #9fe06a; }
+  #err { color: #ff8a80; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+  fieldset { border: 1px solid #343a40; border-radius: 8px; margin: 14px 0; padding: 10px 12px; }
+  #card { width: calc(var(--mm) * 85.6); height: calc(var(--mm) * 53.98); border: 2px dashed #9fe06a; border-radius: calc(var(--mm) * 3.2); margin: 8px 0; display: none; }
+  #card.on { display: block; }
+  input[type=range] { width: 100%; }
+  label { display: block; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div id="phone">
+  <svg viewBox="0 0 853 1999" xmlns="http://www.w3.org/2000/svg">
+    <image href="cover.webp" width="853" height="1999"/>
+    <rect x="283" y="381" width="270" height="61" rx="2" fill="#07090f" stroke="#2c3346" stroke-width="3"/>
+    <text x="418" y="429" font-size="52" text-anchor="middle" textLength="200" lengthAdjust="spacingAndGlyphs" fill="#eef0f4" font-family="'Archivo Black', 'Arial Black', Arial, sans-serif">AURI</text>
+    <g id="keys"></g>
+  </svg>
+  <canvas id="lcd"></canvas>
+  <div id="glass"></div>
+</div>
+
+<aside>
+  <h1>Auri-3310 Simulator</h1>
+  <p id="status">Caricamento MicroPython...</p>
+  <p>Questa pagina esegue i file Python di <code>firmware/</code> in MicroPython compilato per il browser. Sono gli stessi file che girano sul telefono.</p>
+  <p>Tastiera: <kbd>&uarr;</kbd> <kbd>&darr;</kbd>, <kbd>Invio</kbd> = Navi, <kbd>Backspace</kbd> = C, <kbd>0</kbd>-<kbd>9</kbd>, <kbd>*</kbd> <kbd>#</kbd></p>
+  <fieldset>
+    <label><input type="checkbox" id="calib"> Taratura scala 1:1</label>
+    <p>Appoggia una carta di credito sullo schermo e muovi il cursore finché coincide con il riquadro.</p>
+    <input type="range" id="scale" min="2" max="8" step="0.01">
+    <div id="card"></div>
+    <label><input type="checkbox" id="ghost" checked> Persistenza LCD (circa 120 ms)</label>
+  </fieldset>
+  <p>Telefono ricostruito dalla scansione 1:1 della cover (49,8 x 116,8 mm). Area LCD 34,1 x 24,5 mm: sul 3310 i pixel non sono quadrati (0,41 x 0,51 mm).</p>
+  <div id="err"></div>
+</aside>
+
+<script type="module">
+const MP_URL = 'https://cdn.jsdelivr.net/npm/@micropython/micropython-webassembly-pyscript@1.29.0-6/micropython.mjs';
+const FILES = [
+  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py',
+  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py',
+  'hal/__init__.py', 'hal/web.py', 'config.example.json',
+];
+const KEYS = [
+  ['1', 'e', 180, 1320, 85, 55, -8], ['2', 'e', 410, 1345, 85, 52, 0], ['3', 'e', 650, 1320, 85, 55, 8],
+  ['4', 'e', 185, 1445, 85, 55, -8], ['5', 'e', 410, 1480, 85, 52, 0], ['6', 'e', 640, 1445, 85, 55, 8],
+  ['7', 'e', 190, 1600, 85, 55, -8], ['8', 'e', 410, 1620, 85, 52, 0], ['9', 'e', 635, 1600, 85, 55, 8],
+  ['*', 'e', 205, 1730, 85, 55, -8], ['0', 'e', 410, 1760, 85, 52, 0], ['#', 'e', 625, 1730, 85, 55, 8],
+  ['navi', 'e', 420, 1058, 160, 48, 0],
+  ['c', 'p', 'M140,1090 L185,1048 L292,1110 L238,1190 Z'],
+  ['up', 'p', 'M585,1110 L640,1072 L700,1085 L690,1140 L615,1175 Z'],
+  ['down', 'p', 'M470,1150 L585,1110 L615,1175 L560,1210 L490,1245 Z'],
+];
+const KEYBOARD = { ArrowUp: 'up', ArrowDown: 'down', Enter: 'navi', ' ': 'navi', Backspace: 'c', Escape: 'c', Delete: 'c' };
+const PITCH = 0.355, W = 84, H = 48, TAU = 40;
+const BG_LIT = [157, 200, 106], FG_LIT = [28, 43, 20], BG_DARK = [126, 140, 110], FG_DARK = [34, 42, 30];
+
+const $ = id => document.getElementById(id);
+const phone = $('phone'), lcd = $('lcd'), ctx = lcd.getContext('2d');
+const SVGNS = 'http://www.w3.org/2000/svg';
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+for (const [k, kind, ...v] of KEYS) {
+  const g = document.createElementNS(SVGNS, 'g');
+  g.setAttribute('class', 'key');
+  g.dataset.key = k;
+  g.innerHTML = kind === 'e'
+    ? `<ellipse class="hit" cx="${v[0]}" cy="${v[1]}" rx="${v[2]}" ry="${v[3]}" transform="rotate(${v[4]} ${v[0]} ${v[1]})"/>`
+    : `<path class="hit" d="${v[0]}"/>`;
+  $('keys').appendChild(g);
+}
+
+let kx = 4, ky = 5;
+let mmPx = parseFloat(store.get('auri.mm', '')) || 96 / 25.4;
+function applyScale() {
+  document.documentElement.style.setProperty('--mm', mmPx + 'px');
+  $('scale').value = mmPx;
+  const r = lcd.getBoundingClientRect();
+  kx = Math.max(3, Math.round(r.width * devicePixelRatio / W));
+  ky = Math.max(3, Math.round(r.height * devicePixelRatio / H));
+  lcd.width = W * kx; lcd.height = H * ky;
+}
+$('scale').addEventListener('input', e => { mmPx = parseFloat(e.target.value); store.set('auri.mm', mmPx); applyScale(); });
+$('calib').addEventListener('change', e => $('card').classList.toggle('on', e.target.checked));
+applyScale();
+addEventListener('resize', applyScale);
+
+const target = new Uint8Array(W * H), level = new Float32Array(W * H);
+let litUntil = 0, lastFrame = performance.now();
+
+window.auriShow = hex => {
+  for (let b = 0; b < 504; b++) {
+    const v = parseInt(hex.substr(b * 2, 2), 16), x = b % W, bank = (b / W) | 0;
+    for (let i = 0; i < 8; i++) target[(bank * 8 + i) * W + x] = (v >> i) & 1;
+  }
+};
+window.auriLight = on => { litUntil = on ? performance.now() + 15000 : 0; };
+window.auriTime = () => {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), (d.getDay() + 6) % 7, 0].join(',');
+};
+window.auriVibrate = ms => {
+  phone.classList.remove('shake'); void phone.offsetWidth; phone.classList.add('shake');
+  if (navigator.vibrate) navigator.vibrate(ms);
+};
+let audio;
+window.auriBeep = (f, ms) => {
+  try {
+    audio = audio || new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'square'; o.frequency.value = f; g.gain.value = 0.05;
+    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + ms / 1000);
+  } catch {}
+};
+window.auriLoad = n => store.get('auri.' + n, '');
+window.auriSave = (n, v) => store.set('auri.' + n, v);
+window.auriRequest = (method, url, body, token) => {
+  try {
+    const x = new XMLHttpRequest();
+    x.open(method, url, false);
+    x.setRequestHeader('Content-Type', 'application/json');
+    if (token) x.setRequestHeader('Authorization', 'Bearer ' + token);
+    x.send(body || null);
+    if (x.status < 200 || x.status >= 300) return 'ERR HTTP ' + x.status;
+    return x.responseText;
+  } catch (e) { return 'ERR ' + (e.message || e); }
+};
+
+function draw(now) {
+  const dt = now - lastFrame; lastFrame = now;
+  const a = $('ghost').checked ? 1 - Math.exp(-dt / TAU) : 1;
+  const lit = now < litUntil;
+  const bg = lit ? BG_LIT : BG_DARK, fg = lit ? FG_LIT : FG_DARK;
+  const w = lcd.width, h = lcd.height;
+  const grad = ctx.createRadialGradient(w * .5, h * .55, h * .1, w * .5, h * .55, w * .65);
+  grad.addColorStop(0, `rgb(${bg.map(c => Math.min(255, c + (lit ? 14 : 4)))})`);
+  grad.addColorStop(1, `rgb(${bg.map(c => c - (lit ? 22 : 10))})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  const dw = Math.max(1, Math.round(kx * .86)), dh = Math.max(1, Math.round(ky * .88));
+  const sx = Math.max(1, kx * .3), sy = Math.max(1, ky * .3);
+  // LCD segments float above the reflector: each dark pixel casts a faint offset shadow.
+  for (let i = 0; i < W * H; i++) {
+    level[i] += (target[i] - level[i]) * a;
+    const v = level[i];
+    if (v < 0.02) continue;
+    const x = (i % W) * kx, y = ((i / W) | 0) * ky;
+    ctx.fillStyle = `rgba(0,0,0,${0.13 * v})`;
+    ctx.fillRect(x + sx, y + sy, dw, dh);
+    ctx.fillStyle = `rgba(${fg},${0.92 * v})`;
+    ctx.fillRect(x, y, dw, dh);
+  }
+  document.querySelectorAll('.key').forEach(el => el.classList.toggle('glow', lit));
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+let mp, ready = false;
+const py = code => { try { mp.runPython(code); } catch (e) { $('err').textContent = String(e.message || e); } };
+const press = k => ready && py(`hal.press('${k}')`);
+const release = k => ready && py(`hal.release('${k}')`);
+
+document.querySelectorAll('.key').forEach(el => {
+  const k = el.dataset.key;
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.classList.add('down'); el.setPointerCapture(e.pointerId); press(k); });
+  const up = () => { if (el.classList.contains('down')) { el.classList.remove('down'); release(k); } };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+});
+const held = new Set();
+const keyOf = e => KEYBOARD[e.key] || ('0123456789*#'.includes(e.key) && e.key.length === 1 ? e.key : null);
+addEventListener('keydown', e => {
+  const k = keyOf(e); if (!k) return; e.preventDefault();
+  if (held.has(k)) return; held.add(k); press(k);
+  document.querySelector(`.key[data-key="${CSS.escape(k)}"]`)?.classList.add('down');
+});
+addEventListener('keyup', e => {
+  const k = keyOf(e); if (!k || !held.has(k)) return; held.delete(k); release(k);
+  document.querySelector(`.key[data-key="${CSS.escape(k)}"]`)?.classList.remove('down');
+});
+
+(async () => {
+  try {
+    const { loadMicroPython } = await import(MP_URL);
+    mp = await loadMicroPython({ stdout: t => console.log(t), stderr: t => console.error(t) });
+    for (const dir of ['auri', 'apps', 'hal']) mp.FS.mkdir('/' + dir);
+    for (const f of FILES) {
+      const r = await fetch('../' + f, { cache: 'no-store' });
+      if (!r.ok) throw new Error('Non trovo ' + f + ' (avvia il server dalla cartella firmware)');
+      mp.FS.writeFile('/' + f, await r.text());
+    }
+    let cfg = '{}';
+    const c = await fetch('../config.json', { cache: 'no-store' }).catch(() => null);
+    cfg = c && c.ok ? await c.text() : await (await fetch('../config.example.json')).text();
+    mp.FS.writeFile('/config.json', cfg);
+    py(`
+import sys, json
+sys.path.insert(0, '/')
+from hal.web import WebHal
+from auri.core import System
+from apps.home import Home
+hal = WebHal()
+s = System(hal, json.load(open('/config.json')))
+s.push(Home(s))
+hal.light(1)
+`);
+    ready = true;
+    $('status').textContent = 'Auri OS in esecuzione (MicroPython WebAssembly 1.29)';
+    setInterval(() => py('s.step()'), 20);
+  } catch (e) {
+    $('status').textContent = 'Errore di avvio';
+    $('err').textContent = String(e.stack || e);
+  }
+})();
+</script>
+</body>
+</html>

@@ -47,6 +47,9 @@ class Canvas:
 
     def char(self, ch, x, y, c=1, s=1):
         o = ord(ch)
+        if o == 0xB7:
+            self.fill_rect(x + 2 * s, y + 3 * s, s, s, c)
+            return
         if o < 32 or o > 126:
             o = 63
         base = (o - 32) * font.W
