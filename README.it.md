@@ -10,7 +10,16 @@ L'idea è semplice da dire e un po' meno da fare: togliere la scheda madre origi
 
 ## A che punto siamo
 
-Il telefono è smontato e fotografato. Ho studiato la scheda e scritto il [piano di progetto](docs/Nokia_Auri-3310_Piano_Maestro_v2_0.docx). Il prossimo passo è il software, che sviluppo su un simulatore al PC mentre preparo le scansioni per disegnare la nuova scheda.
+Il telefono è smontato e fotografato. Ho studiato la scheda e scritto il [piano di progetto](docs/Nokia_Auri-3310_Piano_Maestro_v2_0.docx). Il software è partito: Auri OS è scritto in MicroPython e gira già in un simulatore sul PC, con menu, scrittura T9 e il primo gioco. Le scansioni 1:1 della scheda sono in `docs/scans`.
+
+![Auri OS nel simulatore](docs/screenshots/1_home.png)
+
+Per provarlo serve solo Python 3:
+
+```
+cd firmware
+python sim.py
+```
 
 Non esiste ancora nessuna PCB. Se cerchi qualcosa da saldare stasera, è troppo presto. Se vuoi dare una mano, è il momento giusto.
 
@@ -32,7 +41,7 @@ Un piccolo sistema operativo, Auri OS, pensato per un display da 84x48 pixel: or
 
 Un'app per la casa: luci, prese, scene e sensori di Home Assistant, dal tastierino.
 
-E la parte che mi diverte di più: **la shell Claude**. Scrivi in T9, oppure tieni premuto il tasto verde e parli. Il telefono manda la richiesta a un piccolo server sul Raspberry Pi di casa, che chiama Claude e gli permette di usare solo gli strumenti che ho deciso io. Quando Claude vuole fare qualcosa, per esempio spegnere le luci o controllare un server, il telefono me lo chiede: verde conferma, rosso annulla.
+E la parte che mi diverte di più: **la shell Claude**. Scrivi in T9, oppure tieni premuto il tasto grande sotto lo schermo e parli. Il telefono manda la richiesta a un piccolo server sul Raspberry Pi di casa, che chiama Claude e gli permette di usare solo gli strumenti che ho deciso io. Quando Claude vuole fare qualcosa, per esempio spegnere le luci o controllare un server, il telefono me lo chiede: il tasto grande conferma, C annulla.
 
 ```
  Nokia 3310            Raspberry Pi             fuori
@@ -43,7 +52,7 @@ E la parte che mi diverte di più: **la shell Claude**. Scrivi in T9, oppure tie
 ## Com'è organizzato
 
 ```
-firmware/   Auri OS per ESP32-S3, più il simulatore per PC
+firmware/   Auri OS in MicroPython, più il simulatore per PC
 bridge/     il server sul Raspberry Pi
 hardware/   schema e PCB in KiCad
 docs/       piano di progetto, foto, scansioni
@@ -52,7 +61,7 @@ docs/       piano di progetto, foto, scansioni
 ## Roadmap
 
 - [x] Smontaggio, foto, analisi della scheda
-- [ ] Simulatore per PC e interfaccia di base
+- [x] Simulatore per PC e interfaccia di base
 - [ ] Bridge e shell Claude funzionanti nel simulatore
 - [ ] Firmware su ESP32-S3 DevKit con un display 5110
 - [ ] Test del display originale

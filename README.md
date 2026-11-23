@@ -10,7 +10,16 @@ The plan is easy to say and harder to do: pull out the original mainboard and re
 
 ## Where things stand
 
-The phone is apart and photographed, I've studied the board and written the [project plan](docs/Nokia_Auri-3310_Piano_Maestro_v2_0.docx) (in Italian for now). Next up is software, which I'm building on a PC simulator while I prepare scans to draw the new board.
+The phone is apart and photographed, I've studied the board and written the [project plan](docs/Nokia_Auri-3310_Piano_Maestro_v2_0.docx) (in Italian for now). Software has started: Auri OS is written in MicroPython and already runs in a PC simulator, with menus, T9 typing and the first game. The 1:1 board scans are in `docs/scans`.
+
+![Auri OS in the simulator](docs/screenshots/1_home.png)
+
+All you need to try it is Python 3:
+
+```
+cd firmware
+python sim.py
+```
 
 There is no PCB yet. If you're looking for something to solder tonight, it's too early. If you'd like to help shape it, it's the right time.
 
@@ -32,7 +41,7 @@ A small operating system, Auri OS, built for an 84x48 screen: clock, menus, T9 t
 
 A home app: lights, plugs, scenes and sensors from Home Assistant, right from the keypad.
 
-And the part I'm most excited about: **the Claude shell**. Type with T9, or hold the green key and talk. The phone sends the request to a small server on the Raspberry Pi at home, which calls Claude and lets it use only the tools I've allowed. Whenever Claude wants to actually do something, like turning off the lights or checking a server, the phone asks first: green to confirm, red to cancel.
+And the part I'm most excited about: **the Claude shell**. Type with T9, or hold the big key under the screen and talk. The phone sends the request to a small server on the Raspberry Pi at home, which calls Claude and lets it use only the tools I've allowed. Whenever Claude wants to actually do something, like turning off the lights or checking a server, the phone asks first: the big key confirms, C cancels.
 
 ```
  Nokia 3310            Raspberry Pi             outside
@@ -43,7 +52,7 @@ And the part I'm most excited about: **the Claude shell**. Type with T9, or hold
 ## Layout
 
 ```
-firmware/   Auri OS for the ESP32-S3, plus the PC simulator
+firmware/   Auri OS in MicroPython, plus the PC simulator
 bridge/     the server running on the Raspberry Pi
 hardware/   KiCad schematic and PCB
 docs/       project plan, photos, scans
@@ -52,7 +61,7 @@ docs/       project plan, photos, scans
 ## Roadmap
 
 - [x] Teardown, photos, board analysis
-- [ ] PC simulator and basic UI
+- [x] PC simulator and basic UI
 - [ ] Bridge and Claude shell working in the simulator
 - [ ] Firmware on an ESP32-S3 DevKit with a 5110 display
 - [ ] Testing the original display

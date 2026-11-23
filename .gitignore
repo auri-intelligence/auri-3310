@@ -8,3 +8,7 @@ __pycache__/
 ~$*
 docs/reference/
 docs/photos/v1_1/
+img/
+firmware/config.json
+firmware/.simdata/
+shots/
