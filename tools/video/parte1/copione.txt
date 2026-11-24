@@ -1,0 +1,8 @@
+AI su un Nokia 3310? Sì. Proprio lui.
+L'ho smontato pezzo per pezzo... e ho scansionato ogni componente a seicento dpi. Cover, tasti, scheda, display. Tutto.
+Perché stiamo costruendo una base precisa al millimetro, partendo da un telefono vero.
+L'idea è semplice: tenere tutto quello che amiamo del 2000, scocca, schermo, tastiera... e cambiare solo il cervello.
+Tieni premuto un tasto, gli parli... e lui ti risponde.
+E la parte migliore? È open source. Lo puoi costruire anche tu. Entra su GitHub e costruiamolo insieme.
+E tu? Scrivimi nei commenti cosa aggiungeresti al tuo Nokia 3310... e lascia un like per supportare il progetto!
+Seguimi per vedere come va a finire. Ce la farà a parlare davvero?

@@ -17,6 +17,19 @@ bridge/config.json
 bridge/.venv/
 bridge/models/
 tools/video/.venv/
-tools/video/out/
+tools/video/*/out/
+tools/video/*/girato/
+tools/video/**/*.mp4
+tools/video/**/*.wav
 docs/scans/componenti fronte.png
 docs/scans/componenti retro.png
+
+# video e audio pesanti, ovunque nel repo
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.avi
+
+# immagini generate per i video (copertine, commenti, profilo)
+tools/video/**/*.png
