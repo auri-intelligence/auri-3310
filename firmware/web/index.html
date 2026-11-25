@@ -75,24 +75,12 @@
   #fsbtn { position: absolute; top: 14px; left: 70px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: rgba(20,24,32,.8); color: var(--fg); font: 600 18px system-ui; cursor: pointer; }
   body.d3 #fsbtn { display: none; }
   body.d3 #infobtn { left: 70px; }
-  #full { display: none; position: fixed; inset: 0; z-index: 20; background: linear-gradient(#1c253d, #141b2e); flex-direction: column; padding: 10px 10px max(10px, env(safe-area-inset-bottom)); gap: 10px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-  body.full #full { display: flex; visibility: visible; }
-  body.full #stage, body.full aside, body.full #toggle { visibility: hidden; }
-  #fullTop { display: flex; align-items: center; justify-content: space-between; height: 44px; }
-  #fullTop .brand { background: #07090f; border: 2px solid #2c3346; border-radius: 4px; padding: 2px 14px; color: #eef0f4; font: 26px 'Archivo Black', 'Arial Black', sans-serif; letter-spacing: 1px; }
-  #fullTop .brand small { font-size: 18px; }
-  #fullTop button { width: 44px; height: 36px; border-radius: 10px; border: 1px solid #39425c; background: #10141f; color: #cfd6e6; font: 600 13px system-ui; }
-  #fullTop .pw { background: #0b0d12; color: var(--accent); }
-  #fullLcd { position: relative; width: 100%; aspect-ratio: 84 / 48; border-radius: 12px; overflow: hidden; border: 6px solid #c9ced8; box-shadow: inset 0 0 0 2px #10141f, 0 6px 18px rgba(0,0,0,.4); background: #7e8c6e; }
-  body.full #fullLcd #lcd { position: absolute; inset: 0; left: 0; top: 0; width: 100%; height: 100%; border-radius: 0; }
-  #fullKeys { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1.15fr repeat(4, 1fr); gap: 9px; min-height: 0; }
-  #fullKeys button { border: 0; border-radius: 48% / 42%; background: radial-gradient(ellipse at 50% 30%, #f1f3f6, #b9bfc9 70%, #8f96a3); color: #16181c; font: 700 22px system-ui; box-shadow: 0 3px 0 #0b0d14, 0 4px 10px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; gap: 6px; }
-  #fullKeys button small { font-size: 12px; font-weight: 600; color: #3a404b; }
-  #fullKeys button.down { transform: translateY(2px); box-shadow: 0 1px 0 #0b0d14; filter: brightness(.9); }
-  #fullKeys .row1 { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 9px; }
-  #fullKeys .row1 .ud { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; }
-  #fullKeys .navi { border-radius: 50% / 40%; background: radial-gradient(ellipse at 50% 30%, #f6f7f9, #c7ccd4 70%); }
-  #fullKeys .navi::after { content: ''; width: 46%; height: 5px; border-radius: 3px; background: #3fb7d8; }
+  /* schermo intero: il telefono originale a tutta larghezza; si taglia solo il bordo sotto i tasti */
+  #fsexit { display: none; position: fixed; top: 10px; right: 10px; z-index: 25; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(20,24,32,.75); color: var(--fg); font: 600 16px system-ui; }
+  body.full #fsexit { display: block; }
+  body.full #stage { position: fixed; inset: 0; right: 0; bottom: 0; z-index: 20; place-items: start center; background: radial-gradient(900px 600px at 50% 30%, #1a2030 0%, var(--bg) 70%); }
+  body.full #phone { margin-top: 0; }
+  body.full aside, body.full #toggle, body.full #fab3d, body.full #fsbtn, body.full #infobtn, body.full #hint3d { display: none; }
 
   #infobtn { position: absolute; top: 14px; left: 126px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--accent); background: rgba(20,24,32,.8); color: var(--accent); font: 700 20px Georgia, serif; cursor: pointer; }
   #info { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(5,7,11,.72); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px; }
@@ -170,17 +158,7 @@ if (!window.AURI_LOCAL) {
   </div>
 </div></div>
 <button id="fsbtn" title="Schermo intero">&#x26F6;</button>
-<div id="full">
-  <div id="fullTop"><button id="fsexit" title="Esci">&#x2715;</button><div class="brand">A<small>ur</small>I</div><button class="pw" data-key="power" title="Tieni premuto per accendere">&#x23FB;</button></div>
-  <div id="fullLcd"></div>
-  <div id="fullKeys">
-    <div class="row1"><button data-key="c">C</button><button class="navi" data-key="navi"></button><div class="ud"><button data-key="up">&#x25B2;</button><button data-key="down">&#x25BC;</button></div></div>
-    <button data-key="1">1<small>oo</small></button><button data-key="2">2<small>abc</small></button><button data-key="3">3<small>def</small></button>
-    <button data-key="4">4<small>ghi</small></button><button data-key="5">5<small>jkl</small></button><button data-key="6">6<small>mno</small></button>
-    <button data-key="7">7<small>pqrs</small></button><button data-key="8">8<small>tuv</small></button><button data-key="9">9<small>wxyz</small></button>
-    <button data-key="*">*<small>+</small></button><button data-key="0">0<small>&#x2423;</small></button><button data-key="#">#</button>
-  </div>
-</div>
+<button id="fsexit" title="Esci dallo schermo intero">&#x2715;</button>
 <button id="fab3d" title="Vista 3D">3D</button>
 <div id="hint3d">Trascina per girarlo &middot; Tieni premuto un pezzo per staccarlo &middot; Doppio tocco per smontare o ricomporre</div>
 </main>
@@ -259,7 +237,9 @@ function applyScale() {
   // telefono il piu' grande possibile nello spazio libero; la scala reale 1:1 solo con la taratura aperta
   // 70 px in alto restano liberi per i pulsanti rotondi (3D, schermo intero, info)
   const room = Math.min((st.height - 140) / 116.8, (st.width - 24) / 49.8);
-  const fit = document.querySelector('aside details[open]') ? Math.min(mmPx, room) : room * 0.96;
+  const full = document.body.classList.contains('full');
+  const fit = full ? Math.min(innerWidth / 49.8, innerHeight / (116.8 * 0.92))
+    : document.querySelector('aside details[open]') ? Math.min(mmPx, room) : room * 0.96;
   document.documentElement.style.setProperty('--mm', fit + 'px');
   $('scale').value = mmPx;
   const r = lcd.getBoundingClientRect();
@@ -390,7 +370,6 @@ if (store.get('auri.info', '') !== '1') { store.set('auri.info', '1'); setInfo(t
 // --- schermo intero e tasti grandi ---
 function setFull(on) {
   document.body.classList.toggle('full', on);
-  (on ? $('fullLcd') : phone).insertBefore(lcd, on ? null : $('glass'));
   if (on) { try { document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.('portrait').catch(() => {})).catch(() => {}); } catch {} }
   else if (document.fullscreenElement) { try { document.exitFullscreen(); } catch {} }
   setTimeout(applyScale, 50);
@@ -399,13 +378,6 @@ function setFull(on) {
 $('fsbtn').addEventListener('click', () => setFull(true));
 $('fsexit').addEventListener('click', () => setFull(false));
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('full')) setFull(false); });
-document.querySelectorAll('#full [data-key]').forEach(b => {
-  const k = b.dataset.key;
-  b.addEventListener('contextmenu', e => e.preventDefault());
-  b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('down'); b.setPointerCapture(e.pointerId); press(k); if (navigator.vibrate) navigator.vibrate(8); });
-  const up = () => { if (b.classList.contains('down')) { b.classList.remove('down'); release(k); } };
-  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
-});
 const held = new Set();
 const keyOf = e => KEYBOARD[e.key] || ('0123456789*#'.includes(e.key) && e.key.length === 1 ? e.key : null);
 addEventListener('keydown', e => {
