@@ -133,12 +133,34 @@
       // Sui browser dei telefoni la memoria della GPU e' limitata (buffer da 128 MB): con una
       // finestra di contesto piu' corta il modello ci sta, con quella piena fallisce e basta.
       const chatOpts = { context_window_size: MOBILE ? 1024 : 2048 };
-      if (engine) {
-        engine.setInitProgressCallback(cb);
-        await engine.reload(id, chatOpts);
-      } else {
-        engine = await webllm.CreateWebWorkerMLCEngine(worker, id, { initProgressCallback: cb }, chatOpts);
+      // Dove salvare il modello: la Cache API sui telefoni spesso fallisce ("Cache.add() encountered a
+      // network error", visto nel registro di un Android 10); IndexedDB invece regge. Sul telefono si usa
+      // subito IndexedDB, altrove si prova la cache e, se fallisce, si riprova da soli con IndexedDB.
+      let idb = MOBILE || store.get('auri.cervello.idb', '') === '1';
+      const crea = async () => {
+        const appConfig = Object.assign({}, webllm.prebuiltAppConfig, { useIndexedDBCache: idb, cacheBackend: idb ? 'indexeddb' : 'cache' });
+        window.auriLog('cervello', 'Modello salvato in ' + (idb ? 'IndexedDB' : 'Cache API'));
+        engine = await webllm.CreateWebWorkerMLCEngine(worker, id, { initProgressCallback: cb, appConfig }, chatOpts);
+      };
+      try {
+        if (engine && engine.__idb === idb) {
+          engine.setInitProgressCallback(cb);
+          await engine.reload(id, chatOpts);
+        } else {
+          await crea();
+        }
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        if (idb || !/Cache|NetworkError|QuotaExceeded|storage/i.test(msg)) throw e;
+        window.auriWarn('cervello', 'La cache del browser non regge (' + msg.slice(0, 80) + '): riprovo con IndexedDB');
+        idb = true;
+        store.set('auri.cervello.idb', '1');
+        try { worker.terminate(); } catch (e2) {}
+        worker = new Worker('auri-llm-worker.js?v=' + Date.now(), { type: 'module' });
+        engine = null;
+        await crea();
       }
+      engine.__idb = idb;
       window.auriLog('cervello', 'Modello pronto');
       st.phase = 'ready';
       st.pct = 100;
