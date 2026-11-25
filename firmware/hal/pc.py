@@ -22,6 +22,8 @@ class PCHal:
         self.on_vibrate = None
         self._clock = clock
         self._t0 = time.monotonic()
+        self.batt = 80
+        self.charging = False
 
     def ticks_ms(self):
         return int((time.monotonic() - self._t0) * 1000)
@@ -46,8 +48,8 @@ class PCHal:
         if self.on_show:
             self.on_show()
 
-    def light(self, on):
-        self.lit_until = self.ticks_ms() + 15000 if on else 0
+    def light(self, on, ms=15000):
+        self.lit_until = (self.ticks_ms() + (ms if ms >= 0 else 10 ** 9)) if on else 0
 
     def lit(self):
         return self.ticks_ms() < self.lit_until
@@ -56,7 +58,7 @@ class PCHal:
         if self.on_vibrate:
             self.on_vibrate(ms)
 
-    def beep(self, freq, ms):
+    def beep(self, freq, ms, vol=3):
         try:
             import winsound
             threading.Thread(target=winsound.Beep, args=(freq, ms), daemon=True).start()
@@ -66,8 +68,14 @@ class PCHal:
     def wifi_level(self):
         return 4
 
+    def battery(self):
+        return self.batt, self.charging
+
     def battery_level(self):
-        return 4
+        return min(4, (self.batt + 12) // 25)
+
+    def power_off(self):
+        pass
 
     def sensors(self):
         t = time.time()

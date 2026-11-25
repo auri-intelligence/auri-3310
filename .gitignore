@@ -33,3 +33,6 @@ docs/scans/componenti retro.png
 
 # immagini generate per i video (copertine, commenti, profilo)
 tools/video/**/*.png
+
+# file temporanei di lavoro (regola: tutto resta su Z:)
+tmp/

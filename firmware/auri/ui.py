@@ -28,15 +28,27 @@ class App:
 
 
 def header(g, title):
-    # Light header: title on the left, a dotted rule underneath instead of a solid black bar.
-    g.text(title[:13], 2, 0)
-    for x in range(0, W, 2):
+    # Title on the left as on the 3310; underneath a solid rule under the title fading into dots.
+    title = title[:13]
+    end = len(title) * 6 + 3
+    g.text(title, 2, 0)
+    g.hline(0, 9, end)
+    g.pixel(end + 1, 9)
+    for x in range(end + 4, W, 2):
         g.pixel(x, 9)
 
 
 def softkey(g, label):
-    if label:
-        g.text_center(label, H - 8)
+    # Centred label as on the 3310, framed by two short tapered rules.
+    if not label:
+        return
+    w = len(label) * 6 - 1
+    x0 = (W - w) // 2
+    g.text(label, x0, H - 8)
+    g.hline(max(0, x0 - 9), H - 4, 5)
+    g.hline(x0 + w + 4, H - 4, 5)
+    g.pixel(max(0, x0 - 11), H - 4)
+    g.pixel(x0 + w + 10, H - 4)
 
 
 class Menu(App):
@@ -66,24 +78,107 @@ class Menu(App):
         elif self.sel >= self.top + VISIBLE - 1:
             self.top = self.sel - VISIBLE + 2
 
+    def tick(self, now):
+        target = 11 + (self.sel - self.top) * 10
+        moving = getattr(self, 'hy', target) != target
+        long_label = len(self.items[self.sel][0]) > 13
+        return moving or long_label
+
     def draw(self, g):
         header(g, self.title)
+        now = self.sys.hal.ticks_ms()
+        # the highlight glides towards the selected row instead of jumping
+        target = 11 + (self.sel - self.top) * 10
+        hy = getattr(self, 'hy', target)
+        hy = target if abs(target - hy) <= 1 else hy + (target - hy) // 2
+        self.hy = hy
+        g.round_fill(0, hy - 1, W - 4, 10, 1)
+        g.dither(1, hy + 9, W - 5, 1, 1)
         for i in range(VISIBLE - 1):
             j = self.top + i
             if j >= len(self.items):
                 break
             y = 11 + i * 10
-            sel = j == self.sel
-            if sel:
-                g.round_fill(0, y - 1, W - 3, 10, 1)
-            g.text(self.items[j][0][:13], 2, y, 0 if sel else 1)
-        if len(self.items) > VISIBLE - 1:
-            for yy in range(11, 39, 3):
-                g.pixel(W - 1, yy)
-            h = max(4, 28 * (VISIBLE - 1) // len(self.items))
-            y = 11 + (28 - h) * self.sel // max(1, len(self.items) - 1)
-            g.vline(W - 1, y, h)
+            label = self.items[j][0]
+            inv = abs(y - hy) < 5
+            if j == self.sel and len(label) > 13:
+                # marquee for labels longer than the screen
+                span = len(label) - 13
+                k = (now // 300) % (span + 6)
+                label = label[max(0, min(span, k - 3)):]
+            g.text(label[:13], 2, y, 0 if inv else 1)
+        n = len(self.items)
+        if n > VISIBLE - 1:
+            for yy in range(11, 39, 2):
+                g.pixel(W - 2, yy)
+            h = max(5, 28 * (VISIBLE - 1) // n)
+            y = 11 + (28 - h) * self.sel // max(1, n - 1)
+            g.fill_rect(W - 3, y, 3, h)
+            g.pixel(W - 3, y, 0)
+            g.pixel(W - 3, y + h - 1, 0)
         softkey(g, self.soft)
+
+
+class IconMenu(App):
+    """3310-style main menu: one entry per page with a big icon, sliding sideways, page dots at the bottom."""
+
+    SLIDE_MS = 160
+
+    def __init__(self, sys, items):
+        super().__init__(sys)
+        self.items = items  # (title, icon rows, action)
+        self.sel = 0
+        self.prev = 0
+        self.t0 = -10000
+        self.dir = 1
+
+    def _go(self, d):
+        self.prev = self.sel
+        self.sel = (self.sel + d) % len(self.items)
+        self.dir = d
+        self.t0 = self.sys.hal.ticks_ms()
+
+    def on_key(self, k):
+        if k == keys.DOWN:
+            self._go(1)
+        elif k == keys.UP:
+            self._go(-1)
+        elif k == keys.NAVI:
+            self.items[self.sel][2]()
+        elif k in keys.DIGITS and k != '0' and int(k) <= len(self.items):
+            self.sel = int(k) - 1
+            self.items[self.sel][2]()
+        else:
+            super().on_key(k)
+
+    def tick(self, now):
+        return now - self.t0 < self.SLIDE_MS + 40
+
+    def _page(self, g, i, dx):
+        title, ico, _ = self.items[i]
+        g.text(title[:12], 2 + dx, 0)
+        g.icon2(ico, (W - 24) // 2 + dx, 11)
+
+    def draw(self, g):
+        p = min(1, (self.sys.hal.ticks_ms() - self.t0) / self.SLIDE_MS)
+        p = 1 - (1 - p) * (1 - p)
+        off = int((1 - p) * W) * self.dir
+        if p < 1:
+            self._page(g, self.prev, -W * self.dir + off)
+        self._page(g, self.sel, off)
+        num = '%d' % (self.sel + 1)
+        g.fill_rect(W - 6 * len(num) - 2, 0, 6 * len(num) + 2, 8, 0)
+        g.text(num, W - 6 * len(num), 0)
+        for x in range(0, W, 2):
+            g.pixel(x, 9)
+        n = len(self.items)
+        x0 = (W - n * 4) // 2
+        for i in range(n):
+            if i == self.sel:
+                g.fill_rect(x0 + i * 4, 37, 3, 3)
+            else:
+                g.pixel(x0 + i * 4 + 1, 38)
+        softkey(g, self.soft if hasattr(self, 'soft') else t('select'))
 
 
 class TextView(App):
@@ -130,8 +225,9 @@ class Confirm(App):
         header(g, t('confirm_q'))
         for i, line in enumerate(self.lines[:3]):
             g.text(line, 0, 11 + i * 9)
-        g.round_fill(0, H - 9, 20, 9, 1)
-        g.text('OK', 4, H - 8, 0)
+        g.round_fill(0, H - 9, 22, 9, 1)
+        g.text('OK', 5, H - 8, 0)
         no = 'C ' + t('no')
-        g.rect(W - len(no) * 6 - 4, H - 9, len(no) * 6 + 4, 9)
-        g.text(no, W - len(no) * 6 - 1, H - 8)
+        x = W - len(no) * 6 - 5
+        g.panel(x, H - 9, len(no) * 6 + 4, 9)
+        g.text(no, x + 2, H - 8)

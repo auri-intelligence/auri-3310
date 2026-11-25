@@ -75,6 +75,13 @@ class ESP32Hal:
     def __init__(self):
         self.lcd = PCD8544()
         self.keys = Keypad()
+        self.pwr = machine.Pin(board.POWER_KEY, machine.Pin.IN, machine.Pin.PULL_UP)
+        self.pwr_down = False
+        self.adc = machine.ADC(machine.Pin(board.BAT_ADC))
+        self.adc.atten(machine.ADC.ATTN_11DB)
+        self.chg = machine.Pin(board.CHG_DET, machine.Pin.IN, machine.Pin.PULL_UP)
+        self.spk = machine.PWM(machine.Pin(board.SPEAKER), freq=1000, duty_u16=0)
+        self.tone_until = 0
         self.bl = machine.PWM(machine.Pin(board.BACKLIGHT), freq=1000, duty_u16=0)
         self.vib = machine.Pin(board.VIBRA, machine.Pin.OUT, value=0)
         self.lit_until = 0
@@ -93,22 +100,36 @@ class ESP32Hal:
         if self.lit_until and time.ticks_diff(time.ticks_ms(), self.lit_until) > 0:
             self.bl.duty_u16(0)
             self.lit_until = 0
-        return self.keys.scan()
+        if self.tone_until and time.ticks_diff(time.ticks_ms(), self.tone_until) > 0:
+            self.spk.duty_u16(0)
+            self.tone_until = 0
+        ev = self.keys.scan()
+        down = not self.pwr()
+        if down != self.pwr_down:
+            self.pwr_down = down
+            ev.append(('down' if down else 'up', 'power'))
+        return ev
 
     def show(self, buf):
         self.lcd.show(buf)
 
-    def light(self, on):
+    def light(self, on, ms=15000):
+        # ms < 0: always on
         self.bl.duty_u16(40000 if on else 0)
-        self.lit_until = time.ticks_add(time.ticks_ms(), 15000) if on else 0
+        self.lit_until = time.ticks_add(time.ticks_ms(), ms) if on and ms >= 0 else 0
 
     def vibrate(self, ms):
         self.vib(1)
         time.sleep_ms(ms)
         self.vib(0)
 
-    def beep(self, freq, ms):
-        pass
+    def beep(self, freq, ms, vol=3):
+        # non-blocking: events() switches the tone off when its time is up
+        if not vol:
+            return
+        self.spk.freq(freq)
+        self.spk.duty_u16(vol * 6000)
+        self.tone_until = time.ticks_add(time.ticks_ms(), ms)
 
     def wifi_level(self):
         if not self.wlan.isconnected():
@@ -116,8 +137,25 @@ class ESP32Hal:
         rssi = self.wlan.status('rssi')
         return 4 if rssi > -55 else 3 if rssi > -65 else 2 if rssi > -75 else 1
 
+    def battery(self):
+        mv = sum(self.adc.read_uv() for _ in range(8)) // 8000 * board.BAT_DIVIDER
+        pct = (mv - board.BAT_EMPTY_MV) * 100 // (board.BAT_FULL_MV - board.BAT_EMPTY_MV)
+        return int(max(0, min(100, pct))), not self.chg()
+
     def battery_level(self):
-        return 4
+        return min(4, (self.battery()[0] + 12) // 25)
+
+    def power_off(self):
+        # LCD in power-down, everything off, then deep sleep until Power is pressed again.
+        import esp32
+        self.lcd.cmd(0x24)
+        self.bl.duty_u16(0)
+        self.spk.duty_u16(0)
+        self.wlan.active(False)
+        while not self.pwr():
+            time.sleep_ms(10)
+        esp32.wake_on_ext0(self.pwr, esp32.WAKEUP_ALL_LOW)
+        machine.deepsleep()
 
     def sensors(self):
         out = {}

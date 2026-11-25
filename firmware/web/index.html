@@ -9,8 +9,11 @@
 <style>
   :root { --mm: 3.78px; --bg: #0f1115; --panel: rgba(255,255,255,.04); --line: rgba(255,255,255,.08); --fg: #e6e8eb; --muted: #8b929b; --accent: #9fe06a; }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { margin: 0; background: radial-gradient(1200px 700px at 30% 20%, #1a2030 0%, var(--bg) 60%); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; gap: 48px; justify-content: center; align-items: center; padding: 32px 16px; flex-wrap: wrap; }
+  html, body { height: 100%; overflow: hidden; }
+  body { margin: 0; background: radial-gradient(1200px 700px at 30% 20%, #1a2030 0%, var(--bg) 60%); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; --pw: 472px; }
+  body.closed { --pw: 0px; }
+  #stage { position: fixed; top: 0; left: 0; bottom: 0; right: var(--pw); display: grid; place-items: center; overflow: hidden; transition: right .3s ease; }
+  #stage > * { grid-area: 1 / 1; }
   #phone { position: relative; width: calc(var(--mm) * 49.8); height: calc(var(--mm) * 116.8); user-select: none; -webkit-user-select: none; touch-action: none; filter: drop-shadow(0 calc(var(--mm) * 3) calc(var(--mm) * 5) rgba(0,0,0,.55)); }
   #phone.shake { animation: shake .25s linear; }
   @keyframes shake { 25% { transform: translateX(calc(var(--mm) * -0.6)); } 75% { transform: translateX(calc(var(--mm) * 0.6)); } }
@@ -22,7 +25,10 @@
   .key.down .hit { fill-opacity: .28; }
   .glow .key .hit { fill: #9fe06a; fill-opacity: .09; }
   .glow .key.down .hit { fill: #000; fill-opacity: .28; }
-  aside { width: 340px; max-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; backdrop-filter: blur(8px); }
+  aside { position: fixed; z-index: 2; top: 16px; right: 16px; bottom: 16px; width: 440px; max-width: calc(100vw - 32px); overflow: hidden; display: flex; flex-direction: column; background: rgba(20,24,32,.85); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; backdrop-filter: blur(8px); transition: transform .3s ease; }
+  aside::-webkit-scrollbar { display: none; }
+  body.closed aside { transform: translateX(calc(100% + 24px)); }
+  #toggle { position: fixed; z-index: 3; top: 50%; right: calc(var(--pw) + 4px); transform: translateY(-50%); width: 26px; height: 56px; border-radius: 8px; border: 1px solid var(--line); background: rgba(20,24,32,.85); color: var(--fg); font: 16px system-ui; cursor: pointer; transition: right .3s ease; }
   h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; letter-spacing: .2px; }
   h1 small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
   .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(159,224,106,.1); color: var(--accent); margin: 6px 0 12px; }
@@ -39,21 +45,40 @@
   #card.on { display: block; }
   fieldset { border: 0; border-top: 1px solid var(--line); margin: 14px 0 0; padding: 10px 0 0; }
   legend { color: var(--fg); padding: 0; }
+  fieldset label { display: grid; grid-template-columns: 92px 72px 1fr; margin: 2px 0; }
+  output { white-space: nowrap; color: var(--muted); }
+  aside p { margin: 4px 0; }
+  aside .row label { margin: 0 8px 0 0; }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   input[type=checkbox] { accent-color: var(--accent); }
   label { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: var(--fg); }
-  #view3d { display: none; position: absolute; z-index: 0; touch-action: none; }
-  aside { position: relative; z-index: 1; }
+  #view3d { display: none; position: absolute; inset: 0; z-index: 0; touch-action: none; }
   body.d3 #view3d { display: block; }
   body.d3 #phone { visibility: hidden; }
   .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .row button, #btn3d { background: rgba(255,255,255,.08); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font: inherit; cursor: pointer; }
+  #fab3d { position: absolute; top: 14px; left: 14px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: rgba(20,24,32,.8); color: var(--fg); font: 600 14px system-ui; cursor: pointer; backdrop-filter: blur(6px); }
+  body.d3 #fab3d { color: var(--accent); border-color: var(--accent); }
+  #hint3d { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 99px; background: rgba(20,24,32,.8); color: var(--muted); font-size: 12px; text-align: center; pointer-events: none; opacity: 0; transition: opacity .6s; }
+  body.d3 #hint3d.on { opacity: 1; }
   #ctl3d { visibility: hidden; }
   body.d3 #ctl3d { visibility: visible; }
+  /* smartphone: telefono a tutto schermo, pannello come foglio dal basso */
+  @media (max-width: 760px) {
+    body, body.closed { --pw: 0px; }
+    #stage { bottom: 56px; }
+    aside { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; max-height: 72vh; overflow-y: auto; scrollbar-width: none; padding: 16px; transition: transform .3s ease; }
+    body.closed aside { transform: translateY(calc(100% + 16px)); }
+    #toggle { top: auto; bottom: 10px; right: 50%; transform: translateX(50%) rotate(90deg); transition: none; }
+    body:not(.closed) #toggle { bottom: calc(72vh + 4px); }
+    aside p:nth-of-type(2) { display: none; }
+    fieldset label { grid-template-columns: 84px 64px 1fr; }
+  }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
+<main id="stage">
 <div id="phone">
   <svg viewBox="0 0 853 1999" xmlns="http://www.w3.org/2000/svg">
     <image href="cover.webp" width="853" height="1999"/>
@@ -65,17 +90,21 @@
   <div id="glass"></div>
 </div>
 <div id="view3d"></div>
+<button id="fab3d" title="Vista 3D">3D</button>
+<div id="hint3d">Trascina per girarlo &middot; Tieni premuto un pezzo per staccarlo &middot; Doppio tocco per smontare o ricomporre</div>
+</main>
+<button id="toggle" title="Pannello">&rsaquo;</button>
 
 <aside>
   <h1>AurI-3310 <small>simulatore</small></h1>
   <div class="pill" id="status">Caricamento MicroPython...</div>
   <p>Gira lo stesso codice Python del telefono, in MicroPython compilato per il browser.</p>
   <p><kbd>&uarr;</kbd> <kbd>&darr;</kbd> scorri &middot; <kbd>Invio</kbd> Navi &middot; <kbd>Backspace</kbd> C &middot; <kbd>0</kbd>-<kbd>9</kbd> <kbd>*</kbd> <kbd>#</kbd></p>
-  <label><input type="checkbox" id="ghost" checked> Persistenza LCD</label>
-  <button id="btn3d">3D</button>
+  <div class="row" style="align-items:center"><label><input type="checkbox" id="ghost" checked> Persistenza LCD</label><button id="btn3d">3D</button></div>
   <div id="ctl3d">
     <div class="row"><button data-view="fronte">Fronte</button><button data-view="retro">Retro</button><button data-view="sinistra">Sinistra</button><button data-view="destra">Destra</button><button data-view="alto">Alto</button><button data-view="sotto">Sotto</button></div>
     <label>Smonta <input type="range" id="explode" min="0" max="1" step="0.01" value="0"></label>
+
   </div>
   <details>
     <summary>Scala reale 1:1</summary>
@@ -88,12 +117,12 @@
   <div id="err"></div>
 </aside>
 
-<script src="auri-io.js"></script>
+<script>document.write('<script src="auri-io.js?v=' + Date.now() + '"><\/script>');</script>
 <script type="module">
 const MP_URL = 'https://cdn.jsdelivr.net/npm/@micropython/micropython-webassembly-pyscript@1.29.0-6/micropython.mjs';
 const FILES = [
-  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py',
-  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py', 'apps/sensori.py', 'apps/assistente.py', 'apps/impostazioni.py',
+  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py', 'auri/settings.py', 'auri/sound.py', 'auri/icons.py',
+  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py', 'apps/sensori.py', 'apps/assistente.py', 'apps/impostazioni.py', 'apps/power.py', 'apps/pet.py',
   'hal/__init__.py', 'hal/web.py', 'config.example.json',
 ];
 const KEYS = [
@@ -105,8 +134,10 @@ const KEYS = [
   ['c', 'p', 'M140,1090 L185,1048 L292,1110 L238,1190 Z'],
   ['up', 'p', 'M585,1110 L640,1072 L700,1085 L690,1140 L615,1175 Z'],
   ['down', 'p', 'M470,1150 L585,1110 L615,1175 L560,1210 L490,1245 Z'],
+  // Power sits on the top edge: in the front view only the upper rim of the cover is touchable
+  ['power', 'p', 'M300,0 L560,0 L560,70 L300,70 Z'],
 ];
-const KEYBOARD = { ArrowUp: 'up', ArrowDown: 'down', Enter: 'navi', ' ': 'navi', Backspace: 'c', Escape: 'c', Delete: 'c' };
+const KEYBOARD = { ArrowUp: 'up', ArrowDown: 'down', Enter: 'navi', ' ': 'navi', Backspace: 'c', Escape: 'c', Delete: 'c', p: 'power', P: 'power', End: 'power' };
 const PITCH = 0.355, W = 84, H = 48, TAU = 40;
 const BG_LIT = [157, 200, 106], FG_LIT = [28, 43, 20], BG_DARK = [126, 140, 110], FG_DARK = [34, 42, 30];
 
@@ -131,7 +162,10 @@ for (const [k, kind, ...v] of KEYS) {
 let kx = 4, ky = 5, dirty = true;
 let mmPx = parseFloat(store.get('auri.mm', '')) || 96 / 25.4;
 function applyScale() {
-  document.documentElement.style.setProperty('--mm', mmPx + 'px');
+  // scala reale 1:1, ridotta solo se il telefono non entra nello schermo (es. smartphone in orizzontale)
+  const st = document.getElementById('stage').getBoundingClientRect();
+  const fit = Math.min(mmPx, (st.height - 24) / 116.8, (st.width - 24) / 49.8);
+  document.documentElement.style.setProperty('--mm', fit + 'px');
   $('scale').value = mmPx;
   const r = lcd.getBoundingClientRect();
   kx = Math.max(3, Math.round(r.width * devicePixelRatio / W));
@@ -144,6 +178,16 @@ $('calib').addEventListener('change', e => $('card').classList.toggle('on', e.ta
 applyScale();
 addEventListener('resize', applyScale);
 
+function setPanel(open) {
+  document.body.classList.toggle('closed', !open);
+  $('toggle').innerHTML = open ? '&rsaquo;' : '&lsaquo;';
+  store.set('auri.panel', open ? '1' : '0');
+  setTimeout(applyScale, 350);
+}
+const narrow = matchMedia('(max-width: 760px)').matches;
+setPanel(narrow ? false : store.get('auri.panel', '1') === '1');
+$('toggle').addEventListener('click', () => setPanel(document.body.classList.contains('closed')));
+
 const target = new Uint8Array(W * H), level = new Float32Array(W * H);
 let litUntil = 0, lastFrame = performance.now();
 
@@ -154,7 +198,8 @@ window.auriShow = hex => {
   }
   dirty = true;
 };
-window.auriLight = on => { litUntil = on ? performance.now() + 15000 : 0; };
+// ms > 0: on for ms; < 0: always on; 0: off
+window.auriLight = ms => { litUntil = ms < 0 ? Infinity : ms > 0 ? performance.now() + ms : 0; dirty = true; };
 window.auriTime = () => {
   const d = new Date();
   return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), (d.getDay() + 6) % 7, 0].join(',');
@@ -164,11 +209,11 @@ window.auriVibrate = ms => {
   if (navigator.vibrate) navigator.vibrate(ms);
 };
 let audio;
-window.auriBeep = (f, ms) => {
+window.auriBeep = (f, ms, vol = 3) => {
   try {
     audio = audio || new AudioContext();
     const o = audio.createOscillator(), g = audio.createGain();
-    o.type = 'square'; o.frequency.value = f; g.gain.value = 0.05;
+    o.type = 'square'; o.frequency.value = f; g.gain.value = 0.012 * vol;
     o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + ms / 1000);
   } catch {}
 };
@@ -260,6 +305,10 @@ addEventListener('keyup', e => {
     let cfg = '{}';
     const c = await fetch('../config.json', { cache: 'no-store' }).catch(() => null);
     cfg = c && c.ok ? await c.text() : await (await fetch('../config.example.json')).text();
+    // Fuori dal PC o dalla rete di casa (es. GitHub Pages) non esiste nessun bridge: niente richieste verso
+    // la rete di chi visita, e le funzioni che ne hanno bisogno spiegano perche' non ci sono.
+    const LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);
+    if (!LOCAL) { const c2 = JSON.parse(cfg); c2.bridge_url = ''; c2.token = ''; c2.online = true; cfg = JSON.stringify(c2); }
     mp.FS.writeFile('/config.json', cfg);
     py(`
 import sys, json
@@ -269,11 +318,16 @@ from auri.core import System
 from apps.home import Home
 hal = WebHal()
 s = System(hal, json.load(open('/config.json')))
-s.push(Home(s))
-hal.light(1)
+s.shut()
 `);
     ready = true;
-    $('status').textContent = 'AurI OS in esecuzione (MicroPython WebAssembly 1.29)';
+    $('status').textContent = 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
+    py('import js');
+    // stato nel pannello: spento o acceso, aggiornato ogni mezzo secondo
+    setInterval(() => {
+      try { mp.runPython('js.window.auriOn = not s.off'); } catch {}
+      $('status').textContent = window.auriOn ? 'AurI OS in esecuzione (MicroPython WebAssembly 1.29)' : 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
+    }, 500);
     setInterval(() => py('s.step()'), 20);
   } catch (e) {
     $('status').textContent = 'Errore di avvio';
@@ -283,16 +337,22 @@ hal.light(1)
 </script>
 <script type="module">
 let p3;
+document.getElementById('fab3d').addEventListener('click', () => document.getElementById('btn3d').click());
 document.getElementById('btn3d').addEventListener('click', async () => {
   const on = document.body.classList.toggle('d3');
   if (on && !p3) {
-    const { createPhone3D } = await import('./phone3d.js');
+    const { createPhone3D } = await import('./phone3d.js?v=' + Date.now());
     p3 = createPhone3D(document.getElementById('view3d'), { press: k => window.auriPress(k), release: k => window.auriRelease(k) });
+    window.auri3d = p3;
+    // il doppio tocco smonta e ricompone: il cursore del pannello lo segue
+    setInterval(() => { const e = document.getElementById('explode'); if (document.activeElement !== e) e.value = p3.explodeTarget; }, 300);
     document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => p3.view(b.dataset.view)));
     document.getElementById('explode').addEventListener('input', e => p3.setExplode(parseFloat(e.target.value)));
   }
   p3?.show(on);
   document.getElementById('btn3d').textContent = on ? '2D' : '3D';
+  document.getElementById('fab3d').textContent = on ? '2D' : '3D';
+  if (on) { const h = document.getElementById('hint3d'); h.classList.add('on'); setTimeout(() => h.classList.remove('on'), 7000); }
 });
 </script>
 </body>

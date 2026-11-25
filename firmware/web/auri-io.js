@@ -6,6 +6,12 @@
 
   window.auriSensors = () => JSON.stringify(sens);
 
+  // Simulated battery: the charger raises the level by 1% every 2 s, like a real charge but faster.
+  const bat = { pct: 80, chg: false };
+  window.auriBattery = () => `${Math.round(bat.pct)},${bat.chg ? 1 : 0}`;
+  let batUi = null;
+  setInterval(() => { if (bat.chg && bat.pct < 100) { bat.pct++; batUi?.(); } }, 2000);
+
   addEventListener('DOMContentLoaded', () => {
     const host = document.querySelector('aside');
     if (!host) return;
@@ -18,8 +24,20 @@
       inp.addEventListener('input', () => { sens[k] = parseFloat(inp.value); out.textContent = `${sens[k]} ${unit}`; });
       box.appendChild(row);
     }
+    const brow = document.createElement('label');
+    brow.innerHTML = 'Batteria <output></output><input type="range" min="0" max="100" step="1">';
+    const bin = brow.querySelector('input'), bout = brow.querySelector('output');
+    batUi = () => { bin.value = bat.pct; bout.textContent = `${bat.pct} %${bat.chg ? ' +' : ''}`; };
+    bin.addEventListener('input', () => { bat.pct = parseInt(bin.value); batUi(); });
+    box.appendChild(brow);
+    const crow = document.createElement('label');
+    crow.style.display = 'flex';
+    crow.innerHTML = '<input type="checkbox"> Caricatore collegato';
+    crow.querySelector('input').addEventListener('change', e => { bat.chg = e.target.checked; batUi(); });
+    box.appendChild(crow);
+    batUi();
     const p = document.createElement('p');
-    p.textContent = 'Voce: nella console Claude tieni premuto Navi (o Invio) e parla, poi rilascia.';
+    p.textContent = 'Accensione: tieni premuto il tasto in alto sulla cover (o P). Voce: tieni premuto Navi.';
     box.appendChild(p);
     host.appendChild(box);
   });

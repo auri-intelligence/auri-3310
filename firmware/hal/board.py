@@ -22,4 +22,13 @@ KEYMAP = (
 I2C_SDA = 1
 I2C_SCL = 2
 
+# Bench placeholders until the H0 prototype: to be checked on the real wiring.
+POWER_KEY = 0        # BOOT button of the DevKitC, active low; also the deep-sleep wake pin
+BAT_ADC = 3          # battery through a 1:2 divider
+BAT_DIVIDER = 2.0
+BAT_EMPTY_MV = 3300
+BAT_FULL_MV = 4150
+CHG_DET = 21         # charger status (e.g. TP4056 CHRG), low while charging
+SPEAKER = 47         # piezo for tones on the bench; the MAX98357A (I2S) comes later
+
 TZ_OFFSET = 3600

@@ -28,20 +28,32 @@ class WebHal:
     def show(self, buf):
         js.auriShow(ubinascii.hexlify(buf).decode())
 
-    def light(self, on):
-        js.auriLight(1 if on else 0)
+    def light(self, on, ms=15000):
+        # ms < 0: always on
+        js.auriLight(ms if on else 0)
 
     def vibrate(self, ms):
         js.auriVibrate(ms)
 
-    def beep(self, freq, ms):
-        js.auriBeep(freq, ms)
+    def beep(self, freq, ms, vol=3):
+        js.auriBeep(freq, ms, vol)
 
     def wifi_level(self):
         return 4
 
+    def battery(self):
+        # a stale cached page may lack the simulated battery: report full instead of crashing
+        try:
+            pct, chg = str(js.auriBattery()).split(',')
+            return int(pct), chg == '1'
+        except Exception:
+            return 100, False
+
     def battery_level(self):
-        return 4
+        return min(4, (self.battery()[0] + 12) // 25)
+
+    def power_off(self):
+        js.auriLight(0)
 
     def sensors(self):
         return json.loads(str(js.auriSensors()))

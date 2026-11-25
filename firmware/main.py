@@ -3,7 +3,6 @@ import network
 import ntptime
 
 from auri.core import System
-from apps.home import Home
 from hal.esp32 import ESP32Hal
 
 with open('config.json') as f:
@@ -16,7 +15,8 @@ if cfg.get('wifi_ssid'):
 
 hal = ESP32Hal()
 s = System(hal, cfg)
-s.push(Home(s))
+# woken by the Power key (or first power-up): real start-up sequence
+s.power_on()
 synced = False
 while True:
     if not synced and wlan.isconnected():

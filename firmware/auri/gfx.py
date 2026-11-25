@@ -110,6 +110,38 @@ class Canvas:
                     self.pixel(x + i, y + j, c)
 
 
+    def dither(self, x, y, w, h, level=2):
+        # fake grey on a 1-bit LCD: 1 = 25%, 2 = 50%, 3 = 75% of the pixels on
+        for j in range(h):
+            for i in range(w):
+                px, py = x + i, y + j
+                on = (px + py) % 2 == 0 if level == 2 else (px % 2 == 0 and py % 2 == 0) if level == 1 else not (px % 2 == 0 and py % 2 == 0)
+                if on:
+                    self.pixel(px, py)
+
+    def panel(self, x, y, w, h):
+        # rounded box with a dithered drop shadow: the "modern" container of popups
+        self.dither(x + 2, y + h, w - 1, 1, 2)
+        self.dither(x + w, y + 2, 1, h - 1, 2)
+        self.fill_rect(x, y, w, h, 0)
+        self.hline(x + 1, y, w - 2)
+        self.hline(x + 1, y + h - 1, w - 2)
+        self.vline(x, y + 1, h - 2)
+        self.vline(x + w - 1, y + 1, h - 2)
+
+    def blit(self, src, y0, y1):
+        # copy rows y0..y1-1 from another canvas (used to clip rolling digits)
+        for y in range(y0, y1):
+            for x in range(W):
+                self.pixel(x, y, src.get(x, y))
+
+    def icon2(self, rows, x, y, c=1, s=2):
+        # pixel art scaled up, clipped by pixel() at the screen edges (used while sliding)
+        for j, r in enumerate(rows):
+            for i, ch in enumerate(r):
+                if ch == '#':
+                    self.fill_rect(x + i * s, y + j * s, s, s, c)
+
     def logo(self, x, y, c=1):
         # "AurI": full-size A and I, a smaller "ur" sitting on the same baseline.
         self.char('A', x, y, c)

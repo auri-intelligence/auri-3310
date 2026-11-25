@@ -1,6 +1,7 @@
 from auri import keys
-from auri.ui import App, Menu, TextView, softkey
-from auri.gfx import W
+from auri.ui import App, IconMenu, TextView, softkey
+from auri import icons
+from auri.gfx import W, Canvas
 from auri.core import VERSION
 from auri.i18n import t, days
 
@@ -18,6 +19,8 @@ class Home(App):
             # Menu opens on release, so that holding Navi can start the assistant instead.
             self._navi = True
         elif k == keys.UP:
+            if self.sys.bridge_missing(t('claude')):
+                return
             from apps.claude import Claude
             self.sys.push(Claude(self.sys))
 
@@ -36,7 +39,14 @@ class Home(App):
             self._sent = now
             from apps.sensori import push_telemetry
             push_telemetry(self.sys)
+        if self.sys.battery[1] and now // 500 != getattr(self, '_f', -1):
+            self._f = now // 500
+            return True
         t = self.sys.hal.localtime()
+        if t[5] != getattr(self, '_sec', -1) or now - getattr(self, '_roll', -9999) < self.ROLL_MS + 40:
+            self._sec = t[5]
+            if t[4] == self._min:
+                return True
         if t[4] != self._min:
             self._min = t[4]
             self._temp = self.sys.hal.sensors().get('temperature')
@@ -52,13 +62,17 @@ class Home(App):
                 g.fill_rect(i * 3, 8 - h, 2, h)
             else:
                 g.pixel(i * 3, 7)
-        lvl = hal.battery_level()
+        pct, chg = self.sys.battery
         g.rect(W - 13, 1, 11, 7)
         g.vline(W - 2, 3, 3)
-        g.fill_rect(W - 12, 2, lvl * 9 // 4, 5)
+        fill = pct * 9 // 100
+        if chg and pct < 100:
+            fill = max(fill, (getattr(self, '_f', 0) % 4) * 3)
+        g.fill_rect(W - 12, 2, fill, 5)
         g.logo_center(0)
         tm = hal.localtime()
-        g.text_center('%02d:%02d' % (tm[3], tm[4]), 12, 1, 2)
+        h = tm[3] if self.sys.settings['clock24'] else (tm[3] % 12 or 12)
+        self._clock(g, '%02d%02d' % (h, tm[4]), tm[5])
         line = '%s %02d/%02d' % (days()[tm[6]], tm[2], tm[1])
         if self._temp is not None:
             line += ' %dC' % round(self._temp)
@@ -66,12 +80,43 @@ class Home(App):
         softkey(g, t('menu'))
 
 
+    ROLL_MS = 350
+
+    def _clock(self, g, digits, sec):
+        # Big clock: changed digits roll up (old out at the top, new in from below), colon blinks every second.
+        now = self.sys.hal.ticks_ms()
+        if getattr(self, '_shown', None) != digits:
+            self._old = getattr(self, '_shown', digits)
+            self._shown = digits
+            self._roll = now
+        p = min(1, (now - getattr(self, '_roll', 0)) / self.ROLL_MS)
+        p = 1 - (1 - p) * (1 - p)
+        x0, y0 = (W - 57) // 2, 12
+        tmp = Canvas()
+        for i, ch in enumerate(digits):
+            x = x0 + i * 12 + (9 if i >= 2 else 0)
+            if p < 1 and ch != self._old[i]:
+                d = int(17 * p)
+                tmp.char(self._old[i], x, y0 - d, 1, 2)
+                tmp.char(ch, x, y0 + 17 - d, 1, 2)
+            else:
+                tmp.char(ch, x, y0, 1, 2)
+        g.blit(tmp, y0, y0 + 16)
+        if sec % 2 == 0 or p < 1:
+            g.fill_rect(x0 + 25, y0 + 4, 2, 2)
+            g.fill_rect(x0 + 25, y0 + 10, 2, 2)
+
+
 def main_menu(sys):
     def open_claude():
+        if sys.bridge_missing(t('claude')):
+            return
         from apps.claude import Claude
         sys.push(Claude(sys))
 
     def open_casa():
+        if sys.bridge_missing(t('home')):
+            return
         from apps.casa import Casa
         sys.push(Casa(sys))
 
@@ -90,6 +135,13 @@ def main_menu(sys):
     def open_info():
         sys.push(TextView(sys, t('info'), 'AurI OS %s\nAurI-3310\n%s' % (VERSION, t('about'))))
 
-    items = [(t('claude'), open_claude), (t('home'), open_casa), (t('snake'), open_snake),
-             (t('sensors'), open_sensori), (t('settings'), open_settings), (t('info'), open_info)]
-    return Menu(sys, t('menu'), [('%d %s' % (i + 1, n), f) for i, (n, f) in enumerate(items)])
+    def open_pet():
+        from apps.pet import Pet
+        sys.push(Pet(sys))
+
+    return IconMenu(sys, [
+        (t('claude'), icons.CLAUDE, open_claude), (t('home'), icons.HOME, open_casa),
+        (t('snake'), icons.SNAKE, open_snake), (t('pet'), icons.PET, open_pet),
+        (t('sensors'), icons.SENSORS, open_sensori), (t('settings'), icons.SETTINGS, open_settings),
+        (t('info'), icons.INFO, open_info),
+    ])
