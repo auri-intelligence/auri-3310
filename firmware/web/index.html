@@ -82,6 +82,9 @@
   body.full #phone { margin-top: 0; }
   body.full aside, body.full #toggle, body.full #fab3d, body.full #fsbtn, body.full #infobtn, body.full #hint3d { display: none; }
 
+  #mutebtn { position: absolute; top: 14px; left: 182px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: rgba(20,24,32,.8); color: var(--fg); font: 600 19px system-ui; cursor: pointer; }
+  body.d3 #mutebtn { left: 126px; }
+  body.full #mutebtn { display: none; }
   #infobtn { position: absolute; top: 14px; left: 126px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--accent); background: rgba(20,24,32,.8); color: var(--accent); font: 700 20px Georgia, serif; cursor: pointer; }
   #info { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(5,7,11,.72); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px; }
   #info.on { display: flex; }
@@ -142,6 +145,7 @@ if (!window.AURI_LOCAL) {
 </div>
 <div id="view3d"></div>
 <button id="infobtn" title="Il progetto">i</button>
+<button id="mutebtn" title="Audio">&#x1F507;</button>
 <div id="info"><div class="card">
   <button class="close" id="infoclose" title="Chiudi">&#x2715;</button>
   <h2>A<small>ur</small>I-3310</h2>
@@ -291,6 +295,7 @@ window.auriVibrate = ms => {
 };
 let audio;
 window.auriBeep = (f, ms, vol = 3) => {
+  if (window.auriMuted) return;
   try {
     audio = audio || new AudioContext();
     const o = audio.createOscillator(), g = audio.createGain();
@@ -298,6 +303,21 @@ window.auriBeep = (f, ms, vol = 3) => {
     o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + ms / 1000);
   } catch {}
 };
+// Audio: il browser non sa se il telefono e' in silenzioso. Sul telefono si parte muti, il pulsante
+// lo accende (e la scelta resta). Accendendo suona un bip, cosi' i tasti del volume agiscono subito.
+const MOBILE_UA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+window.auriMuted = store.get('auri.muto', MOBILE_UA ? '1' : '0') === '1';
+function setMute(m) {
+  window.auriMuted = m;
+  store.set('auri.muto', m ? '1' : '0');
+  $('mutebtn').innerHTML = m ? '&#x1F507;' : '&#x1F50A;';
+  $('mutebtn').title = m ? 'Audio spento: tocca per accenderlo' : 'Audio acceso: tocca per spegnerlo';
+  if (m) { try { speechSynthesis.cancel(); } catch {} }
+  else window.auriBeep(1760, 60, 3);
+  window.auriTrack?.(m ? 'audio/spento' : 'audio/acceso');
+}
+$('mutebtn').addEventListener('click', () => setMute(!window.auriMuted));
+$('mutebtn').innerHTML = window.auriMuted ? '&#x1F507;' : '&#x1F50A;';
 window.auriLoad = n => store.get('auri.' + n, '');
 window.auriSave = (n, v) => store.set('auri.' + n, v);
 window.auriRequest = (method, url, body, token) => {

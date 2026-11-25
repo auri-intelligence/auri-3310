@@ -378,6 +378,7 @@
   // Legge un pezzo mettendolo in coda, senza interrompere quello che sta dicendo: serve per
   // parlare frase per frase mentre il modello sta ancora scrivendo il resto.
   window.auriSpeakNext = (text, lang) => {
+    if (window.auriMuted) return;
     if (!st.speak || !window.speechSynthesis || !text) return '';
     try {
       const u = new SpeechSynthesisUtterance(String(text));
@@ -391,6 +392,7 @@
   };
 
   window.auriSpeak = (text, lang) => {
+    if (window.auriMuted) return;
     if (!st.speak || !window.speechSynthesis || !text) return '';
     try {
       speechSynthesis.cancel();
