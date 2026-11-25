@@ -74,6 +74,10 @@ class PCHal:
     def battery_level(self):
         return min(4, (self.batt + 12) // 25)
 
+    def track(self, name):
+        # anonymous usage counters exist only in the public web simulator
+        pass
+
     def power_off(self):
         pass
 

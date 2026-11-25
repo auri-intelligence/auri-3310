@@ -31,7 +31,14 @@ class System:
         self._full_told = False
 
     # --- stack ---
+    def track(self, name):
+        t = getattr(self.hal, 'track', None)
+        if t:
+            t(name)
+
     def push(self, app):
+        n = type(app).__name__
+        self.track('app/' + (getattr(app, 'kind', '') or (app.title if n == 'Menu' else n)).replace(' ', '_'))
         self.stack.append(app)
         self.dirty = True
 
@@ -56,6 +63,7 @@ class System:
         # True (and an explanation on screen) when this build has no bridge, e.g. the public web simulator
         if self.config.get('bridge_url'):
             return False
+        self.track('non_disponibile/' + title.replace(' ', '_'))
         from auri.ui import TextView
         from auri.i18n import t
         self.push(TextView(self, title, t('need_bridge_web') if self.config.get('online') else t('need_bridge')))
@@ -70,11 +78,13 @@ class System:
 
     # --- power ---
     def power_on(self):
+        self.track('accensione')
         from apps.power import Avvio
         self.stack = [Avvio(self)]
         self.dirty = True
 
     def power_off(self):
+        self.track('spegnimento')
         from apps.power import Spegnimento
         self.stack = [Spegnimento(self)]
         self.dirty = True

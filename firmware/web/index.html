@@ -75,6 +75,23 @@
     fieldset label { grid-template-columns: 84px 64px 1fr; }
   }
 </style>
+<script>
+// Statistiche anonime solo sul sito pubblico (GoatCounter, senza cookie): le prove in locale non si contano.
+window.AURI_LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);
+window.auriTrack = name => { try { if (!window.AURI_LOCAL && window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: 'evento/' + name, title: name, event: true }); } catch (e) {} };
+if (!window.AURI_LOCAL) {
+  const gc = document.createElement('script');
+  gc.async = true; gc.src = 'https://gc.zgo.at/count.js'; gc.dataset.goatcounter = 'https://auri-3310.goatcounter.com/count';
+  document.head.appendChild(gc);
+  // durata della visita a fasce, una sola volta quando la pagina viene chiusa o nascosta
+  const t0 = Date.now(); let sent = false;
+  addEventListener('visibilitychange', () => {
+    if (sent || document.visibilityState !== 'hidden') return;
+    sent = true; const s = (Date.now() - t0) / 1000;
+    window.auriTrack('durata/' + (s < 30 ? 'meno-30s' : s < 120 ? '30s-2m' : s < 300 ? '2-5m' : 'oltre-5m'));
+  });
+}
+</script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
@@ -115,6 +132,7 @@
     <p>Cover 49,8 x 116,8 mm. LCD 34,1 x 24,5 mm, pixel 0,41 x 0,51 mm.</p>
   </details>
   <div id="err"></div>
+  <p id="privacy" style="font-size:11px">Sul sito pubblico: statistiche anonime senza cookie (GoatCounter), solo conteggi di visite e funzioni usate.</p>
 </aside>
 
 <script>document.write('<script src="auri-io.js?v=' + Date.now() + '"><\/script>');</script>
@@ -338,6 +356,7 @@ s.shut()
 <script type="module">
 let p3;
 document.getElementById('fab3d').addEventListener('click', () => document.getElementById('btn3d').click());
+document.getElementById('btn3d').addEventListener('click', () => window.auriTrack(document.body.classList.contains('d3') ? '3d/apri' : '3d/chiudi'));
 document.getElementById('btn3d').addEventListener('click', async () => {
   const on = document.body.classList.toggle('d3');
   if (on && !p3) {

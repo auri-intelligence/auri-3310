@@ -625,6 +625,7 @@ export function createPhone3D(container, { press, release }) {
     gr.g.userData.vel.set(0, 0, 0);
     homing.delete(gr.g);
     if (navigator.vibrate) navigator.vibrate(12);
+    window.auriTrack?.('3d/stacca/' + gr.g.userData.name);
     invalidate();
   }
 
@@ -671,8 +672,8 @@ export function createPhone3D(container, { press, release }) {
     const now = performance.now();
     if (now - lastTap.t < 320 && lastTap.g === (g || null)) {
       if (g && displaced(g)) sendHome(g);
-      else if (layers.some(displaced) || explode > 0.01) reassemble();
-      else { resetPairs(); explodeTarget = 1; }
+      else if (layers.some(displaced) || explode > 0.01) { reassemble(); window.auriTrack?.('3d/ricomponi'); }
+      else { resetPairs(); explodeTarget = 1; window.auriTrack?.('3d/smonta'); }
       lastTap = { t: 0, g: undefined };
     } else lastTap = { t: now, g: g || null };
     invalidate();
@@ -685,7 +686,7 @@ export function createPhone3D(container, { press, release }) {
     if (!grab.mode && Math.hypot(dx, dy) > 6) {
       grab.moved = true;
       clearTimeout(grab.timer);
-      if (grab.freeze) { grab.mode = 'rotate'; controls.enabled = false; homing.delete(grab.g); }
+      if (grab.freeze) { grab.mode = 'rotate'; controls.enabled = false; homing.delete(grab.g); window.auriTrack?.('3d/ruota/' + grab.g.userData.name); }
     }
     if (grab.mode === 'move') {
       setPtr(e);

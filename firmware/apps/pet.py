@@ -109,6 +109,7 @@ class Pet(App):
             s['poop'] = 0
             self.sys.play('g6:32 c7:32', 220)
         self.anim = (a, self.sys.hal.ticks_ms())
+        self.sys.track('aurIpet/' + a[4:])
         self._save()
 
     def tick(self, now):

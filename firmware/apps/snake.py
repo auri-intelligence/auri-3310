@@ -84,6 +84,8 @@ class Snake(App):
         if head in self.body[:-1]:
             self.state = 'dying'
             self.t0 = now
+            sc = self.score
+            self.sys.track('snake/punti_' + ('0' if sc == 0 else '1-4' if sc < 5 else '5-14' if sc < 15 else '15-29' if sc < 30 else '30+'))
             self.sys.vibrate(300)
             self.sys.play('c6:16 g5:16 e5:16 c5:4', 200)
             if self.score > self.best:

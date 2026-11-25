@@ -145,6 +145,10 @@ class ESP32Hal:
     def battery_level(self):
         return min(4, (self.battery()[0] + 12) // 25)
 
+    def track(self, name):
+        # anonymous usage counters exist only in the public web simulator
+        pass
+
     def power_off(self):
         # LCD in power-down, everything off, then deep sleep until Power is pressed again.
         import esp32

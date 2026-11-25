@@ -55,6 +55,12 @@ class WebHal:
     def power_off(self):
         js.auriLight(0)
 
+    def track(self, name):
+        try:
+            js.auriTrack(name)
+        except Exception:
+            pass
+
     def sensors(self):
         return json.loads(str(js.auriSensors()))
 

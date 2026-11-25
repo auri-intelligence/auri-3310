@@ -20,6 +20,10 @@ class Settings:
         return self.d.get(k, DEFAULTS.get(k))
 
     def set(self, **kw):
+        tr = getattr(self.hal, 'track', None)
+        if tr:
+            for k, v in kw.items():
+                tr('impostazione/%s=%s' % (k, v))
         self.d.update(kw)
         self.hal.save('settings', self.d)
 
