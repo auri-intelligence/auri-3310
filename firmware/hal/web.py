@@ -84,6 +84,8 @@ class WebHal:
         return True
 
     def request(self, method, url, body=None, token=None):
+        if not url:
+            return None
         r = js.auriRequest(method, url, json.dumps(body) if body is not None else '', token or '')
         r = str(r)
         if r.startswith('ERR '):

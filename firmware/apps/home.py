@@ -120,9 +120,9 @@ def main_menu(sys):
         from apps.casa import Casa
         sys.push(Casa(sys))
 
-    def open_snake():
-        from apps.snake import Snake
-        sys.push(Snake(sys))
+    def open_giochi():
+        from apps.giochi import menu
+        sys.push(menu(sys))
 
     def open_sensori():
         from apps.sensori import Sensori
@@ -141,7 +141,7 @@ def main_menu(sys):
 
     return IconMenu(sys, [
         (t('claude'), icons.CLAUDE, open_claude), (t('home'), icons.HOME, open_casa),
-        (t('snake'), icons.SNAKE, open_snake), (t('pet'), icons.PET, open_pet),
+        (t('games'), icons.GAMES, open_giochi), (t('pet'), icons.PET, open_pet),
         (t('sensors'), icons.SENSORS, open_sensori), (t('settings'), icons.SETTINGS, open_settings),
         (t('info'), icons.INFO, open_info),
     ])
