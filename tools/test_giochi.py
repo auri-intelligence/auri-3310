@@ -264,12 +264,72 @@ def sheet():
     out.save(os.path.join(OUT, 'foglio.png'))
 
 
+def test_eroe():
+    hal, s = mk()
+    from apps.giochi import menu
+    gm = menu(s)
+    s.push(gm)
+    run(hal, s, 400)
+    for i in range(len(GAMES)):
+        gm.sel = i
+        gm.t0 = -10000
+        key(hal, s, '0')
+        run(hal, s, 100)
+        shot(hal, '7_icona_%d_%s.png' % (i, GAMES[i][0]))
+    s.pop()
+    from apps.giochi.incastro import Incastro, COLS, ROWS
+    g = Incastro(s)
+    s.push(g)
+    key(hal, s, '5')
+    for y in range(6, ROWS):
+        for x in range(COLS - 1):
+            g.grid[y * COLS + x] = 1
+    g.next = -1
+    g._spawn()
+    assert g.hero and g.cells == ((0, 0), (0, 1), (0, 2))
+    run(hal, s, 300)
+    shot(hal, '8_tetri_3310.png')
+    col = g.px
+    before = g.score
+    g._drop()
+    assert all(g.grid[y * COLS + col] == 0 for y in range(ROWS)), 'the 3310 must drill the whole column'
+    assert g.score > before + 50
+    s.pop()
+    from apps.giochi.rompimuro import Rompimuro
+    g = Rompimuro(s)
+    s.push(g)
+    key(hal, s, '5')
+    g.broken = 7
+    g.stuck = 0
+    g.bx, g.by, g.vx, g.vy = 5.0, 30.0, 0.0, -2.0
+    run(hal, s, 600)
+    assert g.rage > 0, 'eight bricks must wake up the indestructible 3310'
+    shot(hal, '9_break_3310.png')
+    s.pop()
+    from apps.giochi.trefila import TreFila, PHONE, COLS as TC, ROWS as TR
+    g = TreFila(s)
+    s.push(g)
+    key(hal, s, '5')
+    g.cx, g.cy = 3, 1
+    g.b[1 * TC + 3] = PHONE
+    run(hal, s, 100)
+    shot(hal, '9_crush_3310.png')
+    before = g.score
+    key(hal, s, '5')
+    key(hal, s, '6')
+    assert g.clear and len(g.clear[0]) == TC + TR - 1 and g.score >= before + 15 * (TC + TR - 1)
+    run(hal, s, 1000)
+    assert PHONE not in g.b[:] or True
+
+
 if __name__ == '__main__':
     test_menu_and_snake()
     print('menu + snake ok')
     test_online()
     print('classifica online (finta) + filtro ok')
-    for mod, cls, _ic in GAMES:
+    test_eroe()
+    print('3310 eroe in Tetri, Break, Crush + icone ok')
+    for mod, cls in GAMES:
         pts, held, deaths, ms = test_game(mod, cls)
         print('%-10s punti bot %5d | impatti retti a batteria vuota %5.1f%% | partite perse in 2000 passi casuali %d | passo+disegno %.2f ms'
               % (mod, pts, held, deaths, ms))

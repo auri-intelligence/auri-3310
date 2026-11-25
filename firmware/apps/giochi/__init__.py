@@ -1,12 +1,12 @@
 from auri.ui import IconMenu
 from auri import icons
+from apps.giochi import icone
 from auri.i18n import t
 
-# (module, class, icon, title key)
+# (module, class); the menu scene is the function of the same name in icone
 GAMES = (
-    ('volo', 'Volo', 'G_VOLO'), ('corsie', 'Corsie', 'G_CORSIE'), ('incastro', 'Incastro', 'G_INCASTRO'),
-    ('rompimuro', 'Rompimuro', 'G_ROMPIMURO'), ('trefila', 'TreFila', 'G_TREFILA'),
-    ('salisali', 'SaliSali', 'G_SALISALI'), ('catapulta', 'Catapulta', 'G_CATAPULTA'),
+    ('volo', 'Volo'), ('corsie', 'Corsie'), ('incastro', 'Incastro'), ('rompimuro', 'Rompimuro'),
+    ('trefila', 'TreFila'), ('salisali', 'SaliSali'), ('catapulta', 'Catapulta'),
 )
 
 
@@ -26,7 +26,7 @@ def menu(sys):
     def snake():
         from apps.snake import Snake
         sys.push(Snake(sys))
-    items = [(t('g_' + m), getattr(icons, ic), _opener(sys, m, c)) for m, c, ic in GAMES]
+    items = [(t('g_' + m), getattr(icone, m), _opener(sys, m, c)) for m, c in GAMES]
     items.append((t('snake'), icons.SNAKE, snake))
     m = IconMenu(sys, items)
     m.kind = 'giochi'

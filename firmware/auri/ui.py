@@ -157,7 +157,10 @@ class IconMenu(App):
     def _page(self, g, i, dx):
         title, ico, _ = self.items[i]
         g.text(title[:12], 2 + dx, 0)
-        g.icon2(ico, (W - 24) // 2 + dx, 11)
+        if callable(ico):
+            ico(g, dx, 11)   # full-width scene, 84x25
+        else:
+            g.icon2(ico, (W - 24) // 2 + dx, 11)
 
     def draw(self, g):
         p = min(1, (self.sys.hal.ticks_ms() - self.t0) / self.SLIDE_MS)

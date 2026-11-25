@@ -13,6 +13,8 @@ GEMS = (
     ('...#...', '...#...', '#######', '.#####.', '..###..', '.##.##.', '#.....#'),   # star
     ('..####.', '.#....#', '#.##..#', '#.##..#', '#.....#', '#..##.#', '#######'),   # sim card
 )
+PHONE = 5
+PHONE_GEM = ('.#####.', '#.....#', '#.###.#', '#.....#', '#.#.#.#', '#.....#', '.#####.')
 DIRS = {'2': (0, -1), '8': (0, 1), '4': (-1, 0), '6': (1, 0), keys.UP: (0, -1), keys.DOWN: (0, 1)}
 
 
@@ -83,6 +85,10 @@ class TreFila(Game):
             i, j = self.cy * COLS + self.cx, ny * COLS + nx
             self._swap(i, j)
             self.sel = False
+            if PHONE in (self.b[i], self.b[j]):
+                self._blast(j if self.b[j] == PHONE else i)
+                self.cx, self.cy = nx, ny
+                return
             if self._matches():
                 self.combo = 0
                 self.cx, self.cy = nx, ny
@@ -93,6 +99,23 @@ class TreFila(Game):
                 self.beep(200, 30)
         else:
             self.cx, self.cy = nx, ny
+
+    def _blast(self, p):
+        # the 3310 explodes: its whole row and column are cleared
+        x, y = p % COLS, p // COLS
+        m = set(y * COLS + c for c in range(COLS)) | set(r * COLS + x for r in range(ROWS))
+        self.combo = 1
+        self.add(15 * len(m), x * CS + 4, Y0 + y * CS)
+        self.clear = [m, 7]
+        self.flash = 2
+        self.shake = 4
+        self.sys.vibrate(120)
+        self.sys.play('c5:32 g5:32 c6:32 g6:16', 240)
+        for c in m:
+            self.burst((c % COLS) * CS + 4, Y0 + (c // COLS) * CS + 4, 2)
+
+    def _gem(self):
+        return PHONE if self.r(25) == 0 else self.r(len(GEMS))
 
     def _resolve(self):
         m = self._matches()
@@ -121,7 +144,7 @@ class TreFila(Game):
                     self.b[c] = 255
                 for x in range(COLS):
                     col = [self.b[y * COLS + x] for y in range(ROWS) if self.b[y * COLS + x] != 255]
-                    col = [self.r(len(GEMS)) for _ in range(ROWS - len(col))] + col
+                    col = [self._gem() for _ in range(ROWS - len(col))] + col
                     for y in range(ROWS):
                         self.b[y * COLS + x] = col[y]
                 self.clear = None
@@ -140,7 +163,8 @@ class TreFila(Game):
             if blink and i in self.clear[0]:
                 g.fill_rect(x + 2, y + 2, 3, 3)
                 continue
-            g.icon(GEMS[self.b[i] % len(GEMS)], x, y)
+            v = self.b[i]
+            g.icon(PHONE_GEM if v == PHONE else GEMS[v % len(GEMS)], x, y)
         x, y = self.cx * CS, Y0 + self.cy * CS
         if self.sel:
             g.rect(x - 1, y - 1, CS + 2, CS + 2)

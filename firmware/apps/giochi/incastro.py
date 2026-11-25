@@ -14,6 +14,7 @@ PIECES = (
     ((1, 0), (0, 1), (1, 1), (2, 1), (1, 2)), ((0, 0), (1, 0), (1, 1), (2, 1)),
 )
 SCORES = (0, 10, 30, 60, 100, 150)
+HERO = ((0, 0), (0, 1), (0, 2))   # the 3310 piece, never rotates
 
 
 class Incastro(Game):
@@ -23,13 +24,15 @@ class Incastro(Game):
         self.grid = bytearray(COLS * ROWS)
         self.lines = 0
         self.next = self.r(len(PIECES))
+        self.hero = False
         self.clearing = []
         self.fall = 0
         self._spawn()
 
     def _spawn(self):
-        self.cells = PIECES[self.next]
-        self.next = self.r(len(PIECES))
+        self.hero = self.next < 0
+        self.cells = HERO if self.hero else PIECES[self.next]
+        self.next = -1 if self.r(7) == 0 else self.r(len(PIECES))
         self.px, self.py = COLS // 2 - 1, 0
         if not self._fits(self.cells, self.px, self.py):
             if not self.hurt(X0 + COLS * C // 2, Y0 + 4):
@@ -49,6 +52,8 @@ class Incastro(Game):
         return True
 
     def _rot(self):
+        if self.hero:
+            return
         c = [(-y, x) for x, y in self.cells]
         mx, my = min(x for x, _ in c), min(y for _, y in c)
         c = tuple((x - mx, y - my) for x, y in c)
@@ -91,7 +96,31 @@ class Incastro(Game):
         if k in ('8', keys.DOWN) and not self.clearing:
             self._drop()
 
+    def _smash(self):
+        # the 3310 does not stack: it drills straight through everything below it
+        x, n = self.px, 0
+        for y in range(self.py, ROWS):
+            if self.grid[y * COLS + x]:
+                self.grid[y * COLS + x] = 0
+                n += 1
+            self.burst(X0 + x * C + 1, Y0 + y * C + 1, 2)
+        self.add(10 + 15 * n, X0 + x * C, Y0 + self.py * C)
+        self.shake = 6
+        self.sys.vibrate(120)
+        self.sys.play('c4:32 g4:32 c5:32 c6:16', 240)
+        self._spawn()
+
+    def _phone(self, g, x, y):
+        g.fill_rect(x, y, C, 3 * C)
+        g.pixel(x + 1, y + 1, 0)
+        g.pixel(x + 1, y + 2, 0)
+        g.pixel(x + 1, y + 5, 0)
+        g.pixel(x + 1, y + 7, 0)
+
     def _lock(self):
+        if self.hero:
+            self._smash()
+            return
         for x, y in self.cells:
             if y + self.py >= 0:
                 self.grid[(self.py + y) * COLS + self.px + x] = 1
@@ -145,15 +174,24 @@ class Incastro(Game):
             gy = self.py
             while self._fits(self.cells, self.px, gy + 1):
                 gy += 1
-            for x, y in self.cells:
-                g.pixel(X0 + (self.px + x) * C + 1, Y0 + (gy + y) * C + 1)
-                if y + self.py >= 0:
-                    g.fill_rect(X0 + (self.px + x) * C, Y0 + (self.py + y) * C, C, C)
+            if self.hero:
+                # drill target: the whole column below lights up
+                for y in range(self.py + 3, ROWS, 2):
+                    g.pixel(X0 + self.px * C + 1, Y0 + y * C + 1, 2)
+                self._phone(g, X0 + self.px * C, Y0 + self.py * C)
+            else:
+                for x, y in self.cells:
+                    g.pixel(X0 + (self.px + x) * C + 1, Y0 + (gy + y) * C + 1)
+                    if y + self.py >= 0:
+                        g.fill_rect(X0 + (self.px + x) * C, Y0 + (self.py + y) * C, C, C)
         bx = X0 + COLS * C + 6
         g.text('%d' % self.lines, bx, 11)
         g.rect(bx, 21, 16, 16)
-        for x, y in PIECES[self.next]:
-            self._cell(g, bx + 3 + x * C, 24 + y * C)
+        if self.next < 0:
+            self._phone(g, bx + 6, 24)
+        else:
+            for x, y in PIECES[self.next]:
+                self._cell(g, bx + 3 + x * C, 24 + y * C)
         g.icon(PHONE, W - 7, 39 - int(2 * abs(sin(self.frame / 4))))
 
     def art(self, g, el):

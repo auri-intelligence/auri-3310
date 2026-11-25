@@ -1,6 +1,6 @@
 from auri import keys
 from auri.gfx import W, H
-from apps.giochi.base import Game, PHONE_BIG, sin
+from apps.giochi.base import Game, PHONE, PHONE_BIG, sin
 
 BW, BH = 11, 4
 BCOLS, BROWS = 7, 4
@@ -20,6 +20,8 @@ class Rompimuro(Game):
         self.px = W / 2 - PW / 2
         self.dir = 0
         self.drops = []
+        self.broken = 0
+        self.rage = 0
         self._level()
 
     def _level(self):
@@ -57,6 +59,9 @@ class Rompimuro(Game):
             self.stuck -= 1
             self.bx = self.px + PW / 2
             return
+        if self.rage:
+            self.rage -= 1
+            self.burst(int(self.bx) + 1, int(self.by) + 2, 1)
         self.bx += self.vx
         self.by += self.vy
         if self.bx < 1 or self.bx > W - 3:
@@ -80,12 +85,22 @@ class Rompimuro(Game):
         r = int((self.by + 2 - BY) // (BH + 1))
         if 0 <= r < BROWS and 0 <= c < BCOLS and self.bricks[r * BCOLS + c]:
             i = r * BCOLS + c
-            self.bricks[i] -= 1
-            self.vy = -self.vy
+            if self.rage:
+                self.bricks[i] = 0      # unstoppable: through every brick, tough ones too
+            else:
+                self.bricks[i] -= 1
+                self.vy = -self.vy
             x, y = c * (BW + 1) + BW // 2, BY + r * (BH + 1)
             if self.bricks[i] == 0:
                 self.add(5 * self.level, x, y)
                 self.burst(x, y, 6)
+                self.broken += 1
+                if self.broken % 8 == 0 and not self.rage:
+                    self.rage = 100
+                    self.flash = 2
+                    self.sys.vibrate(100)
+                    self.sys.play('c6:32 e6:32 g6:32 c7:32 e7:16', 240)
+                    self.pops.append([W // 2 - 15, 26, '3310!', 16])
                 self.beep(1500 + r * 200, 15)
                 if self.r(8) == 0:
                     self.drops.append([x, float(y)])
@@ -120,7 +135,12 @@ class Rompimuro(Game):
         g.fill_rect(px + 1, PY, PW - 2, 3)
         g.hline(px, PY + 1, PW)
         g.hline(px + 3, PY + 1, PW - 6, 0)
-        g.icon(BALL, int(self.bx), int(self.by))
+        if self.rage and (self.frame // 2) % 2:
+            g.icon(PHONE, int(self.bx) - 1, int(self.by) - 2)
+        else:
+            g.icon(BALL, int(self.bx), int(self.by))
+        if self.rage:
+            g.hline(0, 9, self.rage * W // 100)
         for i in range(0, W, 4):
             g.pixel(i + (self.frame % 4), H - 1)
 
