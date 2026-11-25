@@ -85,7 +85,8 @@
 
   function modelId(key) {
     const m = MODELS[key] || MODELS[DEFAULT];
-    return f16 === false ? m.f32 : m.f16;
+    // sui telefoni sempre f32: con f16 alcune GPU mobili (Adreno, Mali) danno testo senza senso
+    return (f16 === false || MOBILE) ? m.f32 : m.f16;
   }
 
   // --- accensione del cervello -------------------------------------------

@@ -21,8 +21,42 @@ function risposta(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// --- Registro del simulatore: quando qualcosa va storto la pagina manda le ultime righe (niente dati
+// personali: app aperta, modello, browser, errori). Si leggono con ?leggi=<chiave>; la chiave sta nelle
+// Proprieta' dello script (REGISTRO_CHIAVE, fissata dalla prima lettura), mai nel codice pubblico.
+function foglioRegistro() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheetByName('Registro') || ss.insertSheet('Registro');
+}
+
+function registro(p) {
+  const testo = String(p.registro || '').slice(0, 6000);
+  const sessione = String(p.sessione || '').slice(0, 16);
+  const motivo = String(p.motivo || '').slice(0, 120);
+  if (!testo) return risposta({ ok: false });
+  const f = foglioRegistro();
+  f.appendRow([new Date(), sessione, motivo, testo]);
+  if (f.getLastRow() > 2000) f.deleteRows(1, f.getLastRow() - 2000);   // tiene le ultime 2000
+  return risposta({ ok: true });
+}
+
+function leggiRegistro(p) {
+  // la prima lettura (dal PC del progetto) fissa la chiave; da li' in poi serve sempre quella
+  const props = PropertiesService.getScriptProperties();
+  let chiave = props.getProperty('REGISTRO_CHIAVE');
+  if (!chiave && String(p.leggi).length >= 20) { chiave = String(p.leggi); props.setProperty('REGISTRO_CHIAVE', chiave); }
+  if (!chiave || p.leggi !== chiave) return risposta({ errore: 'chiave' });
+  const f = foglioRegistro();
+  const n = Math.min(200, parseInt(p.n || '30', 10) || 30);
+  const da = Math.max(1, f.getLastRow() - n + 1);
+  const righe = f.getLastRow() ? f.getRange(da, 1, f.getLastRow() - da + 1, 4).getValues() : [];
+  return risposta({ righe: righe.map(r => [String(r[0]), r[1], r[2], r[3]]) });
+}
+
 function doGet(e) {
   const p = e.parameter || {};
+  if (p.registro) return registro(p);
+  if (p.leggi) return leggiRegistro(p);
   const gioco = String(p.gioco || '');
   if (GIOCHI.indexOf(gioco) < 0) return risposta({ errore: 'gioco' });
   const foglio = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];

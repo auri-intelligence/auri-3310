@@ -42,3 +42,6 @@ tools/voce/
 
 # pesi del cervello del telefono vero (si riscaricano con prepara_sd.py)
 hardware/cervello/pesi/
+
+# chiave per leggere il registro del simulatore (segreta)
+tools/classifica/chiave_registro.txt

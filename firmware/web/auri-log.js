@@ -13,7 +13,7 @@
     const d = new Date();
     return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0');
   };
-  function log(livello, area, testo) {
+  let log = function (livello, area, testo) {
     const r = { t: ora(), l: livello, a: area, m: String(testo).slice(0, 400) };
     righe.push(r);
     if (righe.length > MAX) righe.splice(0, righe.length - MAX);
@@ -21,7 +21,7 @@
     (livello === 'ERR' ? console.error : livello === 'ATT' ? console.warn : console.log)(`[AurI ${area}] ${r.m}`);
     if (livello !== 'INFO') salva();      // errori e avvisi subito: potrebbe essere l'ultima cosa prima del crash
     if (window.auriLogUi) window.auriLogUi();
-  }
+  };
   function salva() {
     if (!sporco) return;
     sporco = false;
@@ -78,5 +78,35 @@
     const m = mem();
     if (m && m - ultimaMem >= 100) { log('INFO', 'memoria', `Memoria JS: ${m} MB`); ultimaMem = m; }
   }, 5000);
+  // --- invio automatico: solo dal sito pubblico e solo quando qualcosa va storto (crash, errore, blocco).
+  // Va nel foglio Google del progetto (lo stesso indirizzo della classifica, file classifica.txt).
+  // Massimo 6 invii a sessione, uno ogni 8 s, ultime 50 righe accorciate. Nessun dato personale.
+  const LOCALE = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+  const sessione = Math.random().toString(36).slice(2, 10);
+  let urlReg = null, invii = 0, inAttesa = null, ultimo = 0;
+  const pronto = LOCALE ? Promise.resolve(null) :
+    fetch('classifica.txt', { cache: 'no-store' }).then(r => r.ok ? r.text() : '').then(t => { t = t.trim(); urlReg = t.startsWith('https://') ? t : null; }).catch(() => {});
+  function manda(motivo) {
+    if (LOCALE || invii >= 6) return;
+    if (inAttesa) return;
+    const attesa = Math.max(0, 8000 - (Date.now() - ultimo));
+    inAttesa = setTimeout(async () => {
+      inAttesa = null;
+      await pronto;
+      if (!urlReg) return;
+      invii++; ultimo = Date.now();
+      const testo = righe.slice(-50).map(r => `${r.t} ${r.l} ${r.a}: ${r.m.slice(0, 160)}`).join(' | ').slice(-5000);
+      const q = 'registro=' + encodeURIComponent(testo) + '&sessione=' + sessione + '&motivo=' + encodeURIComponent(motivo.slice(0, 100));
+      try { await fetch(urlReg + (urlReg.includes('?') ? '&' : '?') + q, { mode: 'no-cors' }); } catch (e) {}
+    }, attesa);
+  }
+  window.auriLogSend = manda;
+  // ogni errore o avviso fa partire un invio (raggruppato), il crash al riavvio subito
+  const logOrig = log;
+  log = function (livello, area, testo) {
+    logOrig(livello, area, testo);
+    if (livello === 'ERR' || (livello === 'ATT' && area !== 'memoria')) manda(`${area}: ${String(testo).slice(0, 80)}`);
+  };
+  if (righe.some(r => r.a === 'crash' && r === righe[righe.length - 2])) manda('crash');
   window.auriLogUptime = () => Math.round((performance.now() - t0) / 1000);
 })();
