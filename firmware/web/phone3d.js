@@ -468,7 +468,7 @@ export function createPhone3D(container, { press, release }) {
       applyExplode(); needs = true;
     }
     if (lcdTex && now - lastLcd > 66) { lastLcd = now; lcdTex.needsUpdate = true; needs = true; }
-    if (needs) { needs = false; composer.render(); }
+    if (needs) { needs = false; composer.render(); drawMap(); }
   }
   requestAnimationFrame(loop);
 
@@ -497,6 +497,67 @@ export function createPhone3D(container, { press, release }) {
     }
     return null;
   };
+
+  // --- Mappa dall'alto (piano x-z): dove sono i pezzi e, in rosso, la zona inquadrata. Tocca un pezzo per centrarlo.
+  const MAPC = { 'Coperchio': '#4a5a86', 'Batteria': '#222', 'Chassis': '#c9ccd2', 'Viti Torx': '#999', 'Scheda (PCB)': '#2f7d3a', 'Display': '#9fe06a', 'Tastierino': '#9fc6ee', 'Cover frontale': '#6f86c4' };
+  const map = document.createElement('canvas');
+  map.width = map.height = 132 * 2;
+  Object.assign(map.style, { position: 'absolute', right: '12px', top: '12px', width: '132px', height: '132px', borderRadius: '12px', background: 'rgba(12,15,22,.78)', border: '1px solid rgba(255,255,255,.12)', touchAction: 'none', zIndex: 3 });
+  container.appendChild(map);
+  const mctx = map.getContext('2d');
+  let mapView = null;
+  const tmpBox = new THREE.Box3();
+  function drawMap() {
+    if (!layers.length) return;
+    const boxes2 = layers.filter(g => g.visible).map(g => ({ g, b: tmpBox.setFromObject(g).clone() }));
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const { b } of boxes2) { x0 = Math.min(x0, b.min.x); x1 = Math.max(x1, b.max.x); z0 = Math.min(z0, b.min.z); z1 = Math.max(z1, b.max.z); }
+    const t = controls.target;
+    // zona inquadrata (in mm): larghezza visibile alla distanza del centro, orientata come la camera
+    const dd = camera.position.distanceTo(t), vh = 2 * dd * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); right.y = 0;
+    const fwd = camera.getWorldDirection(new THREE.Vector3()); fwd.y = 0;
+    if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+    right.normalize(); if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+    const hw = vw / 2, hd = Math.min(vh, vw) / 2;
+    const vcw = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([a, b]) => [t.x + right.x * a + fwd.x * b, t.z + right.z * a + fwd.z * b]);
+    for (const [x, z] of vcw) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const W2 = map.width, pad = 16, sc = (W2 - 2 * pad) / Math.max(x1 - x0, z1 - z0, 120);
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const P = (x, z) => [W2 / 2 + (x - cx) * sc, W2 / 2 + (z - cz) * sc];
+    mapView = { P, sc, cx, cz, boxes2 };
+    mctx.clearRect(0, 0, W2, W2);
+    mctx.strokeStyle = 'rgba(255,255,255,.06)'; mctx.lineWidth = 1;
+    for (let i = 1; i < 6; i++) { const v = i * W2 / 6; mctx.beginPath(); mctx.moveTo(v, 0); mctx.lineTo(v, W2); mctx.moveTo(0, v); mctx.lineTo(W2, v); mctx.stroke(); }
+    for (const { g, b } of boxes2) {
+      const [ax, az] = P(b.min.x, b.min.z), [bx, bz] = P(b.max.x, b.max.z);
+      mctx.fillStyle = MAPC[g.userData.name] || '#888';
+      mctx.globalAlpha = 0.9; mctx.fillRect(ax, az, Math.max(2, bx - ax), Math.max(2, bz - az)); mctx.globalAlpha = 1;
+    }
+    const corners = vcw.map(([x, z]) => P(x, z));
+    mctx.strokeStyle = '#ff4d4d'; mctx.lineWidth = 3; mctx.beginPath();
+    corners.forEach(([x, y], i) => i ? mctx.lineTo(x, y) : mctx.moveTo(x, y)); mctx.closePath(); mctx.stroke();
+    const [ccx, ccz] = P(camera.position.x, camera.position.z);
+    mctx.fillStyle = '#ff4d4d'; mctx.beginPath(); mctx.arc(Math.max(6, Math.min(W2 - 6, ccx)), Math.max(6, Math.min(W2 - 6, ccz)), 5, 0, 7); mctx.fill();
+    mctx.fillStyle = 'rgba(230,232,235,.6)'; mctx.font = '18px system-ui'; mctx.fillText('mappa', 10, W2 - 10);
+  }
+  map.addEventListener('pointerdown', e => {
+    e.stopPropagation(); e.preventDefault();
+    if (!mapView) return;
+    const r = map.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * map.width, mz = (e.clientY - r.top) / r.height * map.height;
+    let best = null, bd = Infinity;
+    for (const { g, b } of mapView.boxes2) {
+      const c = b.getCenter(new THREE.Vector3()), [px, pz] = mapView.P(c.x, c.z), dd = Math.hypot(px - mx, pz - mz);
+      if (dd < bd) { bd = dd; best = c; }
+    }
+    if (best) {
+      // sposta la vista sul pezzo piu' vicino al tocco, mantenendo l'orientamento
+      const off = camera.position.clone().sub(controls.target);
+      controls.target.copy(best); camera.position.copy(best).add(off);
+      controls.update(); invalidate();
+      window.auriTrack?.('3d/mappa');
+    }
+  });
   // Interazione a gesti (skill threejs-interaction: un solo set di pointer event per mouse e dita).
   // Trascina lo sfondo = gira la vista; tieni premuto un pezzo = lo stacchi e lo sposti;
   // trascina un pezzo gia' staccato = lo ruoti; doppio tocco su un pezzo = torna a posto;
@@ -610,7 +671,7 @@ export function createPhone3D(container, { press, release }) {
     applyExplode();
     return true;
   }
-  function reassemble() { resetPairs(); for (const g of layers) if (displaced(g)) sendHome(g); explodeTarget = 0; invalidate(); }
+  function reassemble() { controls.target.copy(TARGET); resetPairs(); for (const g of layers) if (displaced(g)) sendHome(g); explodeTarget = 0; invalidate(); }
   let grab = null, lastTap = { t: 0, g: undefined }, idleTimer = 0;
   const plane = new THREE.Plane(), hitP = new THREE.Vector3();
   const pause = () => { controls.autoRotate = false; clearTimeout(idleTimer); idleTimer = setTimeout(() => { controls.autoRotate = true; }, 9000); };
