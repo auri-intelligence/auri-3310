@@ -114,6 +114,54 @@ def Impostazioni(sys):
             ('2 %s %s' % (t('boot_anim'), onoff(st['boot_anim'])), anim),
         ]
 
+    def cervello():
+        """Dove pensa AurI: nel dispositivo, a casa sul bridge, o come viene."""
+        def motore():
+            def pick(v):
+                def run():
+                    st.set(brain=v)
+                    sys.pop()          # scelta fatta: si torna al menu Cervello
+                    refresh(sys)
+                return run
+            voci = (('auto', t('ai_auto')), ('locale', t('ai_local')), ('bridge', t('ai_bridge')))
+            cur = st['brain']
+            m = Menu(sys, t('ai_engine'), [(('>' if v == cur else ' ') + lab, pick(v)) for v, lab in voci])
+            m.sel = [v for v, _l in voci].index(cur) if cur in [v for v, _l in voci] else 0
+            sys.push(m)
+
+        def modello():
+            lista = []
+            f = getattr(sys.hal, 'ai_models', None)
+            if f:
+                try:
+                    lista = f()
+                except Exception:
+                    lista = []
+            if not lista:
+                sys.toast(t('no_brain'))
+                return
+
+            def pick(k):
+                def run():
+                    st.set(ai_model=k)
+                    sys.pop()
+                    refresh(sys)
+                return run
+            cur = st['ai_model']
+            sys.push(Menu(sys, t('ai_model'), [(('>' if k == cur else ' ') + '%s %dMB' % (nome, mb), pick(k))
+                                               for k, nome, mb in lista]))
+
+        def voce():
+            st.set(ai_voice=not st['ai_voice'])
+            refresh(sys)
+
+        etichette = {'auto': t('ai_auto'), 'locale': t('ai_local'), 'bridge': t('ai_bridge')}
+        return [
+            ('1 %s' % etichette.get(st['brain'], t('ai_auto')), motore),
+            ('2 %s' % t('ai_model'), modello),
+            ('3 %s %s' % (t('ai_voice'), onoff(st['ai_voice'])), voce),
+        ]
+
     def clock():
         def fmt():
             st.set(clock24=not st['clock24'])
@@ -151,9 +199,10 @@ def Impostazioni(sys):
         ('2 ' + t('tones'), submenu(sys, t('tones'), tones)),
         ('3 ' + t('display'), submenu(sys, t('display'), display)),
         ('4 ' + t('clock'), submenu(sys, t('clock'), clock)),
-        ('5 ' + t('battery'), battery),
-        ('6 ' + t('language'), language),
-        ('7 ' + t('info'), info),
-        ('8 ' + t('reset'), reset),
+        ('5 ' + t('ai_engine'), submenu(sys, t('ai_engine'), cervello)),
+        ('6 ' + t('battery'), battery),
+        ('7 ' + t('language'), language),
+        ('8 ' + t('info'), info),
+        ('9 ' + t('reset'), reset),
     ]
     return Menu(sys, t('settings'), items)

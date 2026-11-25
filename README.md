@@ -49,14 +49,15 @@ A small operating system, AurI OS, built for an 84x48 screen: clock, menus, T9 t
 
 A home app: lights, plugs, scenes and sensors from Home Assistant, right from the keypad.
 
-An assistant of its own, **AurI**: hold the power key (or the big key on the home screen), ask something out loud and it answers in a sentence or two, out of the earpiece. Behind it sits Google Gemini on its free tier, and it can switch on the lights I've allowed. It's the quick, everyday voice of the phone.
+An assistant of its own, **AurI**: hold the big key, ask something out loud and it answers in a sentence or two, out of the earpiece. The brain is free and stays home: a small language model running **inside the browser** in the simulator (WebGPU) or **inside the house** on a PC with llama.cpp, and it can switch on the lights I've allowed. No keys, no subscription, nothing leaves the device. How it works: [docs/cervello-locale.md](docs/cervello-locale.md).
 
 And the part I'm most excited about: **the Claude shell**, a separate app with its own menu entry. Type with T9, or hold the big key inside the app and talk. The phone sends the request to a small server on the Raspberry Pi at home, which calls Claude and lets it use only the tools I've allowed. Whenever Claude wants to actually do something, like turning off the lights or checking a server, the phone asks first: the big key confirms, C cancels.
 
 ```
  Nokia 3310            Raspberry Pi             outside
- ESP32-S3  ---Wi-Fi--> AurI Bridge  ----------> Claude, Gemini
- AurI OS   <---------  (Python)     ----------> Home Assistant
+ ESP32-S3  ---Wi-Fi--> AurI Bridge  --local---> llama.cpp (AurI's own brain)
+ AurI OS   <---------  (Python)     ----------> Claude, Home Assistant
+ microSD: a tiny brain even with no network       (the simulator thinks in the browser)
 ```
 
 ## Layout

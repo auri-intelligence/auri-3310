@@ -89,6 +89,14 @@ class ESP32Hal:
         self.i2c = machine.I2C(0, scl=machine.Pin(board.I2C_SCL), sda=machine.Pin(board.I2C_SDA), freq=400000)
         found = self.i2c.scan()
         self.sht = SHT40(self.i2c) if SHT40.ADDR in found else None
+        self.sd = False
+        self._llm = None          # modulo auri_llm, quando c'e'
+        self._llm_state = 'off'   # off | load | ready | gen
+        self._llm_file = None
+        self._llm_got = 0
+        self._llm_size = 0
+        self._llm_name = ''
+        self._llm_text = ''
 
     def ticks_ms(self):
         return time.ticks_ms()
@@ -175,6 +183,124 @@ class ESP32Hal:
 
     def voice_poll(self):
         return {'error': 'Microfono non ancora collegato'}
+
+    # --- microSD -------------------------------------------------------
+    def sd_mount(self):
+        """Monta la microSD su /sd. Ci stanno i pesi del cervello e, volendo, tutto AurI OS."""
+        if self.sd:
+            return True
+        try:
+            import os
+            sd = machine.SDCard(slot=2, sck=machine.Pin(board.SD_SCK), mosi=machine.Pin(board.SD_MOSI),
+                                miso=machine.Pin(board.SD_MISO), cs=machine.Pin(board.SD_CS))
+            os.mount(sd, '/sd')
+            self.sd = True
+        except Exception as e:
+            print('microSD:', e)
+        return self.sd
+
+    def _llm_files(self):
+        """(modello, tokenizer) sulla microSD, oppure None."""
+        if not self.sd_mount():
+            return None
+        import os
+        try:
+            nomi = os.listdir(board.SD_DIR)
+        except OSError:
+            return None
+        modello = next((n for n in nomi if n.endswith('.bin') and 'tok' not in n), None)
+        tok = next((n for n in nomi if n.endswith('.bin') and 'tok' in n), None)
+        if not modello or not tok:
+            return None
+        return (board.SD_DIR + '/' + modello, board.SD_DIR + '/' + tok)
+
+    # --- cervello locale (modulo C auri_llm + pesi dalla microSD) --------
+    def ai_ok(self):
+        if self._llm is None:
+            try:
+                import auri_llm
+                self._llm = auri_llm
+            except ImportError:
+                self._llm = False     # firmware senza il modulo: si usa il bridge
+        return bool(self._llm) and self._llm_files() is not None
+
+    def ai_models(self):
+        f = self._llm_files()
+        if not f:
+            return []
+        import os
+        kb = os.stat(f[0])[6] // 1024
+        nome = f[0].split('/')[-1].replace('.bin', '')
+        return [[nome, nome[:12], max(1, kb // 1024)]]
+
+    def ai_start(self, model=''):
+        """Carica i pesi dalla microSD alla PSRAM, un pezzo per giro: il telefono resta vivo."""
+        f = self._llm_files()
+        if not f or not self._llm:
+            return
+        import os
+        self._llm_name = f[0].split('/')[-1].replace('.bin', '')[:12]
+        self._llm.tokenizer(open(f[1], 'rb').read())
+        self._llm_size = os.stat(f[0])[6]
+        self._llm.begin(self._llm_size)
+        self._llm_file = open(f[0], 'rb')
+        self._llm_got = 0
+        self._llm_state = 'load'
+
+    def _llm_feed(self):
+        buf = bytearray(16384)
+        n = self._llm_file.readinto(buf)
+        if not n:
+            self._llm_file.close()
+            self._llm_file = None
+            try:
+                self._llm.end()
+                self._llm_state = 'ready'
+            except Exception as e:
+                print('cervello:', e)
+                self._llm_state = 'off'
+            return
+        self._llm.feed(buf if n == len(buf) else memoryview(buf)[:n])
+        self._llm_got += n
+
+    def ai_info(self):
+        if self._llm_state == 'load' and self._llm_file:
+            self._llm_feed()
+        pct = 100 * self._llm_got // self._llm_size if self._llm_size else 0
+        return {'phase': self._llm_state, 'pct': pct, 'name': self._llm_name or 'microSD',
+                'mb': max(1, self._llm_size // 1048576), 'error': ''}
+
+    def ai_ask(self, messages, opts=None):
+        if self._llm_state not in ('ready', 'gen'):
+            return 'cervello non pronto'
+        testo = ''
+        for m in messages:
+            if m.get('role') == 'user':
+                testo = m.get('content', '')
+        try:
+            self._llm.start(testo, 0.9, 0.9, int((opts or {}).get('max_tokens', 120)), time.ticks_ms())
+        except Exception as e:
+            return str(e)
+        self._llm_text = ''
+        self._llm_state = 'gen'
+        return ''
+
+    def ai_poll(self):
+        """Due pezzi di testo per giro: cosi' il display continua ad aggiornarsi mentre pensa."""
+        if self._llm_state == 'gen':
+            for _ in range(2):
+                p = self._llm.next()
+                if p is None:
+                    self._llm_state = 'ready'
+                    break
+                self._llm_text += p
+        return {'text': self._llm_text, 'done': 0 if self._llm_state == 'gen' else 1, 'error': ''}
+
+    def ai_stop(self):
+        if self._llm:
+            self._llm.stop()
+        if self._llm_state == 'gen':
+            self._llm_state = 'ready'
 
     def random(self, n):
         return random.getrandbits(16) % n

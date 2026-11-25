@@ -36,3 +36,9 @@ tools/video/**/*.png
 
 # file temporanei di lavoro (regola: tutto resta su Z:)
 tmp/
+
+# clonazione voce locale (venv, modelli, campione della voce)
+tools/voce/
+
+# pesi del cervello del telefono vero (si riscaricano con prepara_sd.py)
+hardware/cervello/pesi/

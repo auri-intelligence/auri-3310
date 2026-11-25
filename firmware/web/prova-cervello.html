@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AurI-3310 - prova del cervello</title>
+<style>
+  :root { color-scheme: dark; --ok: #9fe06a; --ko: #e06a6a; --mu: #8b929b; }
+  body { margin: 0; padding: 24px; background: #0f1115; color: #e6e8eb;
+         font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: var(--mu); margin: 0 0 20px; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; gap: 10px; }
+  li b { min-width: 170px; font-weight: 600; }
+  .ok { color: var(--ok); } .ko { color: var(--ko); } .mu { color: var(--mu); }
+  button { background: var(--ok); color: #10140c; border: 0; border-radius: 8px; padding: 10px 16px;
+           font: 600 14px system-ui; cursor: pointer; }
+  pre { background: rgba(255,255,255,.04); padding: 12px; border-radius: 8px; white-space: pre-wrap;
+        font: 12px/1.5 ui-monospace, Consolas, monospace; }
+  iframe { width: 1px; height: 1px; border: 0; opacity: 0; position: absolute; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Prova del cervello di AurI</h1>
+  <p class="sub">Controlla se questo dispositivo puo' far pensare AurI dentro al browser, senza server.</p>
+  <ul id="esiti"></ul>
+  <p><button id="vai">Accendi il cervello e fai una domanda</button></p>
+  <pre id="log">pronto.</pre>
+  <p class="sub"><a href="./" style="color:var(--ok)">torna al simulatore</a></p>
+</main>
+<script src="auri-llm.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const AUTO = new URLSearchParams(location.search).has('auto');
+let ultimo = '';
+// Con ?auto=1 la prova finisce nel log del server locale (serve.py), cosi' si puo' seguire da riga di comando.
+const log = t => {
+  $('#log').textContent = t;
+  if (AUTO && t !== ultimo) {
+    ultimo = t;
+    fetch('/_prova?' + encodeURIComponent(t.slice(0, 300))).catch(() => {});
+  }
+};
+const riga = (nome, ok, nota) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<b>${nome}</b><span class="${ok === null ? 'mu' : ok ? 'ok' : 'ko'}">${nota}</span>`;
+  $('#esiti').appendChild(li);
+  return li;
+};
+
+(async () => {
+  riga('WebGPU', !!navigator.gpu, navigator.gpu ? 'disponibile' : 'manca: serve Chrome o Edge aggiornati');
+  let ad = null;
+  // su qualche dispositivo la richiesta della scheda non risponde mai: si aspetta al massimo 3 s
+  try {
+    if (navigator.gpu) ad = await Promise.race([navigator.gpu.requestAdapter(),
+      new Promise(r => setTimeout(() => r(null), 3000))]);
+  } catch (e) {}
+  let nomeGpu = '';
+  try {
+    const gi = ad && (ad.info || (ad.requestAdapterInfo ? await ad.requestAdapterInfo() : null));
+    if (gi) nomeGpu = [gi.vendor, gi.architecture || gi.device, gi.description].filter(Boolean).join(' ').trim();
+  } catch (e) {}
+  // la scheda finta (software) fa funzionare tutto lo stesso, ma a passo di lumaca: meglio saperlo
+  const soft = !!(ad && ad.isFallbackAdapter) || /swiftshader|llvmpipe|software|basic render/i.test(nomeGpu);
+  riga('Scheda grafica', !!ad && !soft, !ad ? 'nessuna scheda disponibile'
+      : (nomeGpu || 'senza nome')
+        + (ad.features && ad.features.has('shader-f16') ? ', shader-f16 ok' : ', senza shader-f16')
+        + (soft ? ' - e software: sara molto lento' : ''));
+  if (AUTO) log('scheda grafica: ' + (nomeGpu || 'senza nome') + (soft ? ' SOFTWARE' : ''));
+  const sr = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  riga('Ascolto (voce)', sr, sr ? 'disponibile' : 'manca: si scrive col T9');
+  const ss = !!window.speechSynthesis;
+  const voci = ss ? (speechSynthesis.getVoices() || []).filter(v => v.lang.toLowerCase().startsWith('it')) : [];
+  riga('Lettura (voce)', ss, ss ? (voci.length ? 'voce italiana: ' + voci[0].name : 'disponibile, nessuna voce italiana') : 'manca');
+  const ponte = typeof window.auriAiInfo === 'function';
+  riga('Ponte col telefono', ponte, ponte ? 'auri-llm.js caricato' : 'auri-llm.js non caricato');
+  const info = ponte ? JSON.parse(auriAiInfo()) : {};
+  riga('Modello scelto', null, (info.name || '?') + ' (circa ' + (info.mb || '?') + ' MB, si scarica una volta sola)');
+  if (AUTO) await prova();
+})();
+
+async function prova() {
+  const t0 = Date.now();
+  log('accendo il cervello: la prima volta scarica il modello...');
+  auriAiStart();
+  for (let i = 0; i < 1800; i++) {
+    const s = JSON.parse(auriAiInfo());
+    if (s.phase === 'ready') break;
+    if (s.phase === 'err') { log('errore: ' + (s.error || 'sconosciuto')); return; }
+    log('scarico e accendo: ' + s.pct + '% ' + (s.note || ''));
+    await new Promise(r => setTimeout(r, 500));
+  }
+  log('cervello acceso, faccio la domanda...');
+  const err = auriAiAsk(JSON.stringify([
+    { role: 'system', content: "Ti chiami AurI. Sei l'assistente che vive dentro un vecchio telefono con lo "
+      + "schermo piccolo. Non hai altri nomi e non sei l'assistente di nessuna marca. Rispondi sempre in "
+      + 'italiano con una o due frasi brevi. Solo testo semplice: niente elenchi, niente markdown, niente emoji.' },
+    { role: 'user', content: 'Chi sei?' },
+    { role: 'assistant', content: "Sono AurI, l'assistente di questo telefono. Dimmi pure." },
+    { role: 'user', content: 'Ciao! Cosa sai fare?' },
+  ]), JSON.stringify({ max_tokens: 60 }));
+  if (err) { log('errore: ' + err); return; }
+  for (let i = 0; i < 600; i++) {
+    const r = JSON.parse(auriAiPoll());
+    log('risposta: ' + r.text + (r.done ? '\n\nfatto in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s, ' + r.tps + ' pezzi al secondo.' : ' ...'));
+    if (r.done) { auriSpeak(r.text, 'it'); return; }
+    await new Promise(r2 => setTimeout(r2, 250));
+  }
+}
+
+$('#vai').addEventListener('click', prova);
+</script>
+</body>
+</html>

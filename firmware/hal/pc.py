@@ -95,6 +95,16 @@ class PCHal:
     def voice_poll(self):
         return {'error': 'Voce solo nel simulatore web'}
 
+    def ai_ok(self):
+        # Nella finestra del PC il cervello sta sul bridge (llama.cpp o Gemini), non qui.
+        return False
+
+    def speak(self, text, lang='it'):
+        pass
+
+    def speak_stop(self):
+        pass
+
     def random(self, n):
         return random.randrange(n)
 

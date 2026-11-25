@@ -74,6 +74,57 @@ class WebHal:
         r = str(js.auriVoicePoll())
         return json.loads(r) if r else None
 
+    # --- cervello locale: il modello gira nel browser con WebGPU (web/auri-llm.js) ---
+    def ai_ok(self):
+        try:
+            return bool(js.auriAiInfo)
+        except Exception:
+            return False      # pagina vecchia in cache, senza auri-llm.js
+
+    def ai_info(self):
+        return json.loads(str(js.auriAiInfo()))
+
+    def ai_models(self):
+        return json.loads(str(js.auriAiModels()))
+
+    def ai_start(self, model=''):
+        js.auriAiStart(model or '')
+
+    def ai_ask(self, messages, opts=None):
+        return str(js.auriAiAsk(json.dumps(messages), json.dumps(opts or {})))
+
+    def ai_poll(self):
+        return json.loads(str(js.auriAiPoll()))
+
+    def ai_stop(self):
+        js.auriAiStop()
+
+    # --- voce del browser: ascolto (push-to-talk) e lettura ad alta voce ---
+    def hear_start(self, lang='it'):
+        try:
+            return bool(js.auriHearStart(lang))
+        except Exception:
+            return False
+
+    def hear_stop(self):
+        js.auriHearStop()
+
+    def hear_poll(self):
+        r = str(js.auriHearPoll())
+        return json.loads(r) if r else {'text': '', 'done': 1, 'error': ''}
+
+    def speak(self, text, lang='it'):
+        try:
+            js.auriSpeak(text, lang)
+        except Exception:
+            pass
+
+    def speak_stop(self):
+        try:
+            js.auriSpeakStop()
+        except Exception:
+            pass
+
     def random(self, n):
         return int(js.Math.random() * n)
 

@@ -7,6 +7,16 @@ Copyright (c) 2012 Adafruit Industries. BSD License: redistribution and use in s
 
 **Archivo Black** (loaded from Google Fonts by the web simulator), SIL Open Font License 1.1, Copyright Omnibus-Type.
 
+**WebLLM** (`@mlc-ai/web-llm`, loaded at runtime by the web simulator from jsDelivr), Apache License 2.0, Copyright MLC-AI and contributors.
+
+# AurI brain models (downloaded at runtime by the visitor's browser or by a setup script, not stored in this repository)
+
+**Qwen2.5 and Qwen3** language models, Apache License 2.0, Copyright Alibaba Cloud / Qwen team. In the web simulator they are the MLC builds published by mlc-ai on Hugging Face; on the bridge they are the GGUF builds published by unsloth.
+**SmolLM2**, Apache License 2.0, Hugging Face (HuggingFaceTB).
+**llama.cpp** and **llama-server**, MIT License, Copyright (c) 2023-2026 The ggml authors. Downloaded by `bridge/setup_llm.ps1` / `.sh` into `bridge/models/llm`; removing that folder removes everything.
+**llama2.c** checkpoint and tokenizer formats, MIT License, Copyright (c) 2023 Andrej Karpathy. `hardware/cervello/auri_llm/auri_llm.c` and `hardware/cervello/prova_llm.py` are original code that reads those formats; no llama2.c source is included here. The **tinyllamas** weights (stories260K, stories15M) are MIT as well and are downloaded by `hardware/cervello/prepara_sd.py` only when asked.
+**Web Speech API**: speech recognition in the web simulator is the browser's own. In Chrome it sends the recorded audio to Google's servers; text input with T9 stays entirely on the device. Reading answers aloud uses the voices installed on the device.
+
 # Trademarks
 
 Nokia and 3310 are trademarks of Nokia Corporation. Claude and Claude Code are trademarks of Anthropic. Gemini and Google are trademarks of Google LLC.

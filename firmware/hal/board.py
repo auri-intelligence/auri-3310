@@ -31,4 +31,12 @@ BAT_FULL_MV = 4150
 CHG_DET = 21         # charger status (e.g. TP4056 CHRG), low while charging
 SPEAKER = 47         # piezo for tones on the bench; the MAX98357A (I2S) comes later
 
+# microSD (SPI): ci stanno il cervello locale e, volendo, tutto AurI OS.
+# Pin di banco, da confermare sul prototipo H0.
+SD_SCK = 36
+SD_MOSI = 35
+SD_MISO = 37
+SD_CS = 34
+SD_DIR = '/sd/auri/cervello'     # dove stanno modello.bin e tokenizer.bin
+
 TZ_OFFSET = 3600

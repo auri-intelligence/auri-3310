@@ -69,10 +69,9 @@ class System:
         self.push(TextView(self, title, t('need_bridge_web') if self.config.get('online') else t('need_bridge')))
         return True
 
-    def assistant(self, trigger):
-        from auri.i18n import t
-        if self.bridge_missing(t('assistant').capitalize()):
-            return
+    def assistant(self, trigger=None):
+        # Il cervello puo' essere nel dispositivo (browser o microSD) o sul bridge di casa:
+        # l'assistente si apre sempre e dentro spiega cosa manca.
         from apps.assistente import Assistente
         self.push(Assistente(self, trigger))
 

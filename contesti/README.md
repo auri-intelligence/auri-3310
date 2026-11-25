@@ -13,4 +13,5 @@ Regole fisse del progetto:
 - Ogni scrittura fuori dal PC (commit, push, GitHub) si fa solo dopo conferma esplicita, una alla volta.
 - Nessun dato personale online: niente nomi utente, percorsi del PC, email reali, token o chiavi in file pubblicati. `config.json` di bridge e firmware restano fuori da git.
 - La voce appartiene all'assistente centrale AurI (come "Ok Google"/Bixby), non alla console Claude.
+- Tutto il lavoro resta sul disco Z: (cartella del progetto). Mai salvare script, texture, video, screenshot o altri file utili nello scratchpad, in %TEMP% o in altre cartelle di C:, che si possono cancellare. File temporanei solo dentro il progetto (es. una cartella `tmp/` esclusa da git).
 - Il bridge e i suoi modelli restano circoscritti in `bridge/.venv` e `bridge/models`: cancellando le due cartelle si rimuove tutto.

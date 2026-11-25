@@ -49,14 +49,15 @@ Un piccolo sistema operativo, AurI OS, pensato per un display da 84x48 pixel: or
 
 Un'app per la casa: luci, prese, scene e sensori di Home Assistant, dal tastierino.
 
-Un assistente tutto suo, **AurI**: tieni premuto il tasto di accensione (o il tasto grande nella schermata iniziale), chiedi qualcosa a voce e ti risponde in una frase o due, dall'altoparlante. Dietro c'è Google Gemini con il piano gratuito, e può accendere le luci che ho autorizzato. È la voce veloce, di tutti i giorni, del telefono.
+Un assistente tutto suo, **AurI**: tieni premuto il tasto grande, chiedi qualcosa a voce e ti risponde in una frase o due, dall'altoparlante. Il cervello è gratuito e sta in casa: un modello di linguaggio piccolo che gira **dentro il browser** nel simulatore (WebGPU) o **dentro casa** sul PC con llama.cpp, e può accendere le luci che ho autorizzato. Nessuna chiave, nessun abbonamento, le domande non escono dal dispositivo. Come funziona: [docs/cervello-locale.md](docs/cervello-locale.md).
 
 E la parte che mi diverte di più: **la shell Claude**, un'app a parte con la sua voce nel menu. Scrivi in T9, oppure tieni premuto il tasto grande dentro l'app e parli. Il telefono manda la richiesta a un piccolo server sul Raspberry Pi di casa, che chiama Claude e gli permette di usare solo gli strumenti che ho deciso io. Quando Claude vuole fare qualcosa, per esempio spegnere le luci o controllare un server, il telefono me lo chiede: il tasto grande conferma, C annulla.
 
 ```
- Nokia 3310            Raspberry Pi             fuori
- ESP32-S3  ---Wi-Fi--> AurI Bridge  ----------> Claude, Gemini
- AurI OS   <---------  (Python)     ----------> Home Assistant
+ Nokia 3310            Raspberry Pi o PC        fuori
+ ESP32-S3  ---Wi-Fi--> AurI Bridge  --locale--> llama.cpp (il cervello di AurI)
+ AurI OS   <---------  (Python)     ----------> Claude, Home Assistant
+ microSD: cervello minimo anche senza rete        (il simulatore pensa nel browser)
 ```
 
 ## Com'è organizzato
@@ -64,7 +65,7 @@ E la parte che mi diverte di più: **la shell Claude**, un'app a parte con la su
 ```
 firmware/   AurI OS in MicroPython, più il simulatore per PC
 bridge/     il server sul Raspberry Pi
-hardware/   schema e PCB in KiCad
+hardware/   schema e PCB in KiCad, cervello del telefono vero (microSD + modulo C)
 docs/       piano di progetto, foto, scansioni
 ```
 

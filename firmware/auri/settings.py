@@ -1,6 +1,9 @@
 DEFAULTS = {
     'profile': 'normal', 'volume': 3, 'ringtone': 0, 'vibra': True, 'keytones': True,
     'light_s': 15, 'boot_anim': True, 'clock24': True, 'welcome': '',
+    # cervello dell'assistente: 'auto' (il bridge se c'e', altrimenti il modello locale),
+    # 'locale' (sempre il modello del dispositivo), 'bridge' (sempre quello di casa)
+    'brain': 'auto', 'ai_model': 'base', 'ai_voice': True,
 }
 
 # volume, vibration, key tones

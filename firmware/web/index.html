@@ -67,7 +67,7 @@
   body.d3 #hint3d.on { opacity: 1; }
 
   /* indicazione del tasto di accensione quando il telefono e' spento */
-  #powerhint { position: absolute; left: 50%; top: calc(var(--mm) * -14); transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 2px; color: var(--accent); font: 600 12px system-ui; white-space: nowrap; pointer-events: none; animation: bob 1.1s ease-in-out infinite; }
+  #powerhint { position: absolute; left: 50%; top: calc(var(--mm) * -14); transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 2px; padding: 6px 14px; border-radius: 99px; background: rgba(20,24,32,.72); color: var(--accent); font: 600 13px system-ui; white-space: nowrap; pointer-events: none; animation: bob 1.1s ease-in-out infinite; }
   #powerhint b { font-size: 22px; line-height: 1; }
   body.off:not(.d3):not(.full) #powerhint { display: flex; }
   @keyframes bob { 50% { transform: translate(-50%, 6px); } }
@@ -127,7 +127,7 @@ if (!window.AURI_LOCAL) {
 </script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
-<body>
+<body class="off">
 <main id="stage">
 <div id="phone">
   <svg viewBox="0 0 853 1999" xmlns="http://www.w3.org/2000/svg">
@@ -184,14 +184,15 @@ if (!window.AURI_LOCAL) {
     <p>Cover 49,8 x 116,8 mm. LCD 34,1 x 24,5 mm, pixel 0,41 x 0,51 mm.</p>
   </details>
   <div id="err"></div>
-  <p id="privacy" style="font-size:11px">Sul sito pubblico: statistiche anonime senza cookie (GoatCounter), solo conteggi di visite e funzioni usate.</p>
+  <p id="privacy" style="font-size:11px">Sul sito pubblico: statistiche anonime senza cookie (GoatCounter), solo conteggi di visite e funzioni usate. Il cervello di AurI gira nel tuo browser: le domande non vengono inviate a nessun server. Se usi la voce, il riconoscimento vocale del browser (su Chrome) manda l audio ai server di Google: puoi sempre scrivere col T9.</p>
 </aside>
 
 <script>document.write('<script src="auri-io.js?v=' + Date.now() + '"><\/script>');</script>
+<script>document.write('<script src="auri-llm.js?v=' + Date.now() + '"><\/script>');</script>
 <script type="module">
 const MP_URL = 'https://cdn.jsdelivr.net/npm/@micropython/micropython-webassembly-pyscript@1.29.0-6/micropython.mjs';
 const FILES = [
-  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py', 'auri/settings.py', 'auri/sound.py', 'auri/icons.py',
+  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py', 'auri/settings.py', 'auri/sound.py', 'auri/icons.py', 'auri/cervello.py',
   'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py', 'apps/sensori.py', 'apps/assistente.py', 'apps/impostazioni.py', 'apps/power.py', 'apps/pet.py',
   'apps/giochi/__init__.py', 'apps/giochi/base.py', 'apps/giochi/icone.py', 'apps/giochi/classifica.py', 'apps/giochi/volo.py', 'apps/giochi/corsie.py', 'apps/giochi/incastro.py', 'apps/giochi/rompimuro.py', 'apps/giochi/trefila.py', 'apps/giochi/salisali.py', 'apps/giochi/catapulta.py',
   'hal/__init__.py', 'hal/web.py', 'config.example.json',
@@ -429,15 +430,36 @@ s.shut()
     // stato nel pannello: spento o acceso, aggiornato ogni mezzo secondo
     setInterval(() => {
       try { mp.runPython('js.window.auriOn = not s.off'); } catch {}
+      // nome dell'app in cima alla pila: serve alle prove automatiche (e a capire dove siamo)
+      try { mp.runPython('js.window.auriTop = type(s.top).__name__'); document.body.dataset.app = window.auriTop; } catch {}
       document.body.classList.toggle('off', !window.auriOn);
       $('status').textContent = window.auriOn ? 'AurI OS in esecuzione (MicroPython WebAssembly 1.29)' : 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
     }, 500);
     setInterval(() => py('s.step()'), 20);
+    autoKeys();
   } catch (e) {
     $('status').textContent = 'Errore di avvio';
     $('err').textContent = String(e.stack || e);
   }
 })();
+
+// Prove automatiche e dimostrazioni: #tasti=power:1700,pausa:6000,navi,navi preme i tasti da solo.
+// Ogni voce e' tasto[:millisecondi di pressione], una ogni mezzo secondo.
+async function autoKeys() {
+  const m = /(?:^|[#&])tasti=([^&]+)/.exec(location.hash);
+  if (!m) return;
+  const pausa = ms => new Promise(r => setTimeout(r, ms));
+  await pausa(600);
+  for (const voce of decodeURIComponent(m[1]).split(',')) {
+    const [k, ms] = voce.split(':');
+    if (!k) continue;
+    if (k === 'pausa') { await pausa(parseInt(ms || '1000', 10)); continue; }
+    window.auriPress(k);
+    await pausa(parseInt(ms || '90', 10));
+    window.auriRelease(k);
+    await pausa(500);
+  }
+}
 </script>
 <script type="module">
 let p3;

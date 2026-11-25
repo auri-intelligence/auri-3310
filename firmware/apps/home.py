@@ -19,10 +19,12 @@ class Home(App):
             # Menu opens on release, so that holding Navi can start the assistant instead.
             self._navi = True
         elif k == keys.UP:
-            if self.sys.bridge_missing(t('claude')):
-                return
-            from apps.claude import Claude
-            self.sys.push(Claude(self.sys))
+            # Su freccia: la console Claude dove c'e' il bridge, altrimenti l'assistente AurI.
+            if self.sys.config.get('bridge_url'):
+                from apps.claude import Claude
+                self.sys.push(Claude(self.sys))
+            else:
+                self.sys.assistant()
 
     def on_long(self, k):
         if k == keys.NAVI:
@@ -139,9 +141,14 @@ def main_menu(sys):
         from apps.pet import Pet
         sys.push(Pet(sys))
 
-    return IconMenu(sys, [
-        (t('claude'), icons.CLAUDE, open_claude), (t('home'), icons.HOME, open_casa),
+    items = [('AurI', icons.AURI, lambda: sys.assistant())]
+    # La console Claude esiste solo dove c'e' il bridge: online al suo posto c'e' l'assistente AurI.
+    if sys.config.get('bridge_url'):
+        items.append((t('claude'), icons.CLAUDE, open_claude))
+    items += [
+        (t('home'), icons.HOME, open_casa),
         (t('games'), icons.GAMES, open_giochi), (t('pet'), icons.PET, open_pet),
         (t('sensors'), icons.SENSORS, open_sensori), (t('settings'), icons.SETTINGS, open_settings),
         (t('info'), icons.INFO, open_info),
-    ])
+    ]
+    return IconMenu(sys, items)
