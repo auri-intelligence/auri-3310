@@ -102,10 +102,12 @@
     if (!gpu.ok) {
       st.phase = 'err';
       st.error = gpu.reason;
+      window.auriWarn('cervello', 'Niente WebGPU: ' + gpu.reason);
       if (ui) ui();
       track('cervello/no_webgpu');
       return;
     }
+    window.auriLog('cervello', `Accendo il modello ${st.key} (${modelId(st.key)}), f16=${f16}, telefono=${MOBILE}`);
     st.phase = 'load';
     st.pct = 0;
     st.note = '';
@@ -114,10 +116,15 @@
     track('cervello/accendi');
     try {
       if (!webllm) webllm = await import(WEBLLM);
-      if (!worker) worker = new Worker('auri-llm-worker.js?v=' + Date.now(), { type: 'module' });
+      if (!worker) {
+        worker = new Worker('auri-llm-worker.js?v=' + Date.now(), { type: 'module' });
+        worker.addEventListener('error', e => window.auriErr('cervello', "Il worker del modello e' caduto: " + (e.message || '?')));
+      }
       const cb = r => {
         // r.progress va da 0 a 1 durante lo scaricamento e la compilazione
-        st.pct = Math.max(0, Math.min(100, Math.round((r.progress || 0) * 100)));
+        const pct = Math.max(0, Math.min(100, Math.round((r.progress || 0) * 100)));
+        if (Math.floor(pct / 25) !== Math.floor(st.pct / 25)) window.auriLog('cervello', `Caricamento ${pct}%: ${String(r.text || '').slice(0, 90)}`);
+        st.pct = pct;
         st.note = String(r.text || '').slice(0, 120);
         if (ui) ui();
       };
@@ -131,6 +138,7 @@
       } else {
         engine = await webllm.CreateWebWorkerMLCEngine(worker, id, { initProgressCallback: cb }, chatOpts);
       }
+      window.auriLog('cervello', 'Modello pronto');
       st.phase = 'ready';
       st.pct = 100;
       st.note = '';
@@ -139,6 +147,7 @@
     } catch (e) {
       st.phase = 'err';
       st.error = String((e && e.message) || e).slice(0, 200);
+      window.auriErr('cervello', 'Il modello non si accende: ' + st.error);
       if (ui) ui();
       track('cervello/errore');
     }
@@ -188,6 +197,7 @@
       }
     }
     stop = false;
+    window.auriLog('cervello', `Domanda (${messages.length} messaggi, tentativo ${tentativo + 1})`);
     st.phase = 'gen';
     st.tps = 0;
     st.first = 0;            // ms prima del primo pezzo: serve all'app per intrattenere mentre aspetta
@@ -227,6 +237,7 @@
         const ch = chunk.choices && chunk.choices[0];
         const d = (ch && ch.delta && ch.delta.content) || '';
         if (d) {
+          if (!n) window.auriLog('cervello', `Primo pezzo di risposta dopo ${Math.round(performance.now() - t0)} ms`);
           st.text += d;
           n++;
           leggiAvanti(false);
@@ -236,13 +247,15 @@
       leggiAvanti(true);
       const ms = performance.now() - t0;
       st.tps = n && ms > 0 ? Math.round(n * 1000 / ms * 10) / 10 : 0;
+      window.auriLog('cervello', `Risposta finita: ${n} pezzi in ${(ms / 1000).toFixed(1)} s (${st.tps}/s)`);
       track('cervello/risposta');
     } catch (e) {
       const msg = String((e && e.message) || e);
-      console.warn('AurI cervello:', msg);
+      window.auriErr('cervello', 'Errore durante la risposta: ' + msg.slice(0, 250));
       if (mine === gen && GPU_ERR.test(msg) && tentativo === 0 && !st.text) {
         // la GPU del telefono si e' inceppata: si ricarica il modello (dalla cache, pochi secondi)
         track('cervello/ripresa_gpu');
+        window.auriWarn('cervello', 'La GPU si e\' inceppata: ricarico il modello e riprovo');
         try { await engine.unload(); } catch (e2) {}
         engine = null;
         if (worker) { try { worker.terminate(); } catch (e3) {} worker = null; }

@@ -4,14 +4,16 @@ W = 84
 H = 48
 
 
+_ZERO = bytes(W * H // 8)
+
+
 class Canvas:
     # Buffer layout matches PCD8544 RAM: 6 banks of 84 bytes, bit 0 = top pixel of the bank.
     def __init__(self):
         self.buf = bytearray(W * H // 8)
 
     def clear(self):
-        for i in range(len(self.buf)):
-            self.buf[i] = 0
+        self.buf[:] = _ZERO
 
     def pixel(self, x, y, c=1):
         if 0 <= x < W and 0 <= y < H:
@@ -187,3 +189,77 @@ def wrap(text, cols=14):
                 line = word
         lines.append(line)
     return lines
+
+
+# --- framebuf (MicroPython, scritto in C): stesso formato del display (MONO_VLSB), quindi le
+# operazioni piu' usate passano a lui. Sul PC (CPython) non c'e' e resta il disegno in Python.
+try:
+    import framebuf as _fb
+except ImportError:
+    _fb = None
+
+if _fb is not None:
+    _GLYPHS = {}
+    _PAL0 = _fb.FrameBuffer(bytearray(1), 2, 1, _fb.MONO_HLSB)   # colore 1 -> 0 (testo "spento")
+    _PAL0.pixel(0, 0, 1)
+    _PAL0.pixel(1, 0, 0)
+    _py_init = Canvas.__init__
+    _py_pixel = Canvas.pixel
+    _py_char = Canvas.char
+
+    def _init(self):
+        _py_init(self)
+        self.fb = _fb.FrameBuffer(self.buf, W, H, _fb.MONO_VLSB)
+
+    def _pixel(self, x, y, c=1):
+        if c == 2:
+            _py_pixel(self, x, y, 2)
+        elif 0 <= x < W and 0 <= y < H:
+            self.fb.pixel(x, y, 1 if c else 0)
+
+    def _hline(self, x, y, w, c=1):
+        if c == 2:
+            for i in range(w):
+                _py_pixel(self, x + i, y, 2)
+        else:
+            self.fb.hline(x, y, w, 1 if c else 0)
+
+    def _vline(self, x, y, h, c=1):
+        if c == 2:
+            for i in range(h):
+                _py_pixel(self, x, y + i, 2)
+        else:
+            self.fb.vline(x, y, h, 1 if c else 0)
+
+    def _fill_rect(self, x, y, w, h, c=1):
+        if c == 2:
+            for j in range(h):
+                _hline(self, x, y + j, w, 2)
+        else:
+            self.fb.fill_rect(x, y, w, h, 1 if c else 0)
+
+    def _char(self, ch, x, y, c=1, s=1):
+        if s != 1 or c == 2:
+            return _py_char(self, ch, x, y, c, s)
+        o = ord(ch)
+        if o == 0xB7:
+            return _py_char(self, ch, x, y, c, s)
+        if o > 126:
+            o = ord(FOLD.get(ch, '?'))
+        elif o < 32:
+            o = 63
+        g = _GLYPHS.get(o)
+        if g is None:
+            base = (o - 32) * font.W
+            g = _GLYPHS[o] = _fb.FrameBuffer(bytearray(font.FONT[base:base + font.W]), font.W, 8, _fb.MONO_VLSB)
+        if c:
+            self.fb.blit(g, x, y, 0)
+        else:
+            self.fb.blit(g, x, y, 0, _PAL0)
+
+    Canvas.__init__ = _init
+    Canvas.pixel = _pixel
+    Canvas.hline = _hline
+    Canvas.vline = _vline
+    Canvas.fill_rect = _fill_rect
+    Canvas.char = _char

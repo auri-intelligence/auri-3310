@@ -111,6 +111,7 @@
     fieldset label { grid-template-columns: 84px 64px 1fr; }
   }
 </style>
+<script src="auri-log.js"></script>
 <script>
 // Statistiche anonime solo sul sito pubblico (GoatCounter, senza cookie): le prove in locale non si contano.
 window.AURI_LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);
@@ -186,6 +187,12 @@ if (!window.AURI_LOCAL) {
     <input type="range" id="scale" min="2" max="8" step="0.01">
     <div id="card"></div>
     <p>Cover 49,8 x 116,8 mm. LCD 34,1 x 24,5 mm, pixel 0,41 x 0,51 mm.</p>
+  </details>
+  <details id="registro">
+    <summary>Registro (cosa succede, anche dopo un crash)</summary>
+    <pre id="logbox" style="max-height:220px;overflow:auto;font-size:10px;white-space:pre-wrap;background:#0b0e13;padding:6px;border-radius:6px"></pre>
+    <button id="logcopy">Copia</button> <button id="logclear">Svuota</button>
+    <p style="font-size:11px">Resta solo in questo browser. Se qualcosa non va, copia e incolla queste righe.</p>
   </details>
   <div id="err"></div>
   <p id="privacy" style="font-size:11px">Sul sito pubblico: statistiche anonime senza cookie (GoatCounter), solo conteggi di visite e funzioni usate. Il cervello di AurI gira nel tuo browser: le domande non vengono inviate a nessun server. Se usi la voce, il riconoscimento vocale del browser (su Chrome) manda l audio ai server di Google: puoi sempre scrivere col T9.</p>
@@ -276,7 +283,10 @@ $('toggle').addEventListener('click', () => setPanel(document.body.classList.con
 const target = new Uint8Array(W * H), level = new Float32Array(W * H);
 let litUntil = 0, lastFrame = performance.now();
 
+let lastHex = '';
 window.auriShow = hex => {
+  if (hex === lastHex) return;
+  lastHex = hex;
   for (let b = 0; b < 504; b++) {
     const v = parseInt(hex.substr(b * 2, 2), 16), x = b % W, bank = (b / W) | 0;
     for (let i = 0; i < 8; i++) target[(bank * 8 + i) * W + x] = (v >> i) & 1;
@@ -318,6 +328,17 @@ function setMute(m) {
 }
 $('mutebtn').addEventListener('click', () => setMute(!window.auriMuted));
 $('mutebtn').innerHTML = window.auriMuted ? '&#x1F507;' : '&#x1F50A;';
+// registro nel pannello: si aggiorna al massimo due volte al secondo e solo se e' aperto
+let logT = 0;
+window.auriLogUi = () => {
+  if (!$('registro') || !$('registro').open || logT) return;
+  logT = setTimeout(() => { logT = 0; const b = $('logbox'); b.textContent = window.auriLogText(); b.scrollTop = b.scrollHeight; }, 500);
+};
+$('registro').addEventListener('toggle', () => { logT = 0; window.auriLogUi(); });
+$('logcopy').addEventListener('click', () => { navigator.clipboard?.writeText(window.auriLogText()); $('logcopy').textContent = 'Copiato'; });
+$('logclear').addEventListener('click', () => window.auriLogClear());
+// se l'ultima volta si e' chiuso di colpo, il registro si apre da solo
+if (window.auriLogRows().some(r => r.a === 'crash' && r.t >= '00')) { const last = window.auriLogRows().slice(-40).find(r => r.a === 'crash'); if (last) $('registro').open = true; }
 window.auriLoad = n => store.get('auri.' + n, '');
 window.auriSave = (n, v) => store.set('auri.' + n, v);
 window.auriRequest = (method, url, body, token) => {
@@ -353,35 +374,54 @@ window.auriFetchPoll = id => {
   return r === undefined ? 'ERR perso' : r;
 };
 
-let wasLit = null;
+let wasLit = null, lastPaint = 0;
+const bgCache = { key: '' };
 function draw(now) {
   const dt = now - lastFrame; lastFrame = now;
   const lit = now < litUntil;
   if (lit !== wasLit) { wasLit = lit; dirty = true; phone.classList.toggle('glow', lit); }
   if (!dirty) return requestAnimationFrame(draw);
+  // al massimo 30 disegni al secondo: lo schermo vero non va piu' veloce e il telefono respira
+  if (now - lastPaint < 30) return requestAnimationFrame(draw);
+  lastPaint = now;
   const a = $('ghost').checked ? 1 - Math.exp(-dt / TAU) : 1;
   const bg = lit ? BG_LIT : BG_DARK, fg = lit ? FG_LIT : FG_DARK;
   const w = lcd.width, h = lcd.height;
-  const grad = ctx.createRadialGradient(w * .5, h * .55, h * .1, w * .5, h * .55, w * .65);
-  grad.addColorStop(0, `rgb(${bg.map(c => Math.min(255, c + (lit ? 14 : 4)))})`);
-  grad.addColorStop(1, `rgb(${bg.map(c => c - (lit ? 22 : 10))})`);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  // sfondo (gradiente) disegnato una volta sola e poi copiato: prima si ricreava a ogni fotogramma
+  const bgKey = w + 'x' + h + (lit ? 'L' : 'D');
+  if (bgCache.key !== bgKey) {
+    bgCache.c = bgCache.c || document.createElement('canvas');
+    bgCache.c.width = w; bgCache.c.height = h;
+    const bx = bgCache.c.getContext('2d');
+    const grad = bx.createRadialGradient(w * .5, h * .55, h * .1, w * .5, h * .55, w * .65);
+    grad.addColorStop(0, `rgb(${bg.map(c => Math.min(255, c + (lit ? 14 : 4)))})`);
+    grad.addColorStop(1, `rgb(${bg.map(c => c - (lit ? 22 : 10))})`);
+    bx.fillStyle = grad; bx.fillRect(0, 0, w, h);
+    bgCache.key = bgKey;
+  }
+  ctx.drawImage(bgCache.c, 0, 0);
   const dw = Math.max(1, Math.round(kx * .86)), dh = Math.max(1, Math.round(ky * .88));
   const sx = Math.max(1, kx * .3), sy = Math.max(1, ky * .3);
   let moving = false;
-  // Shadows first in one pass, then pixels: two fillStyle changes per level instead of per pixel.
   for (let i = 0; i < W * H; i++) {
     const d = target[i] - level[i];
     if (d) { level[i] = Math.abs(d) < 0.01 ? target[i] : level[i] + d * a; moving = moving || level[i] !== target[i]; }
   }
+  // tutti i pixel in pochi tracciati: 1 per le ombre + 1 per livello di grigio (8 livelli),
+  // invece di migliaia di fillRect ognuno con il suo colore
+  ctx.beginPath();
+  for (let i = 0; i < W * H; i++) if (level[i] > 0.5) ctx.rect((i % W) * kx + sx, ((i / W) | 0) * ky + sy, dw, dh);
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
-  for (let i = 0; i < W * H; i++) if (level[i] > 0.5) ctx.fillRect((i % W) * kx + sx, ((i / W) | 0) * ky + sy, dw, dh);
-  for (let i = 0; i < W * H; i++) {
-    const v = level[i];
-    if (v < 0.02) continue;
-    ctx.fillStyle = v > 0.98 ? `rgb(${fg})` : `rgba(${fg},${0.92 * v})`;
-    ctx.fillRect((i % W) * kx, ((i / W) | 0) * ky, dw, dh);
+  ctx.fill();
+  for (let q = 1; q <= 8; q++) {
+    const lo = (q - 1) / 8, hi = q / 8;
+    let any = false;
+    ctx.beginPath();
+    for (let i = 0; i < W * H; i++) {
+      const v = level[i];
+      if (v >= 0.02 && v > lo && v <= hi) { ctx.rect((i % W) * kx, ((i / W) | 0) * ky, dw, dh); any = true; }
+    }
+    if (any) { ctx.fillStyle = q === 8 ? `rgb(${fg})` : `rgba(${fg},${(0.92 * hi).toFixed(2)})`; ctx.fill(); }
   }
   dirty = moving;
   if (window.auriPerf) window.auriPerf.draw = window.auriPerf.draw * 0.9 + (performance.now() - now) * 0.1;
@@ -390,7 +430,7 @@ function draw(now) {
 requestAnimationFrame(draw);
 
 let mp, ready = false;
-const py = code => { try { mp.runPython(code); } catch (e) { $('err').textContent = String(e.message || e); } };
+const py = code => { try { mp.runPython(code); } catch (e) { const m = String(e.message || e); $('err').textContent = m; window.auriErr('python', m.split('\n').slice(-3).join(' | ')); } };
 // Prima che MicroPython sia pronto: premere accensione fa partire lo snake di caricamento sul display
 // e il telefono si accende da solo appena e' pronto (prima il tocco andava perso).
 let wantOn = false, loadAnim = 0;
@@ -497,6 +537,7 @@ s = System(hal, json.load(open('/config.json')))
 s.shut()
 `);
     ready = true;
+    window.auriLog('avvio', 'AurI OS pronto (MicroPython caricato)');
     $('status').textContent = 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
     if (wantOn) { clearInterval(loadAnim); py('s.power_on()'); }
     py('import js');
@@ -504,24 +545,31 @@ s.shut()
     setInterval(() => {
       try { mp.runPython('js.window.auriOn = not s.off'); } catch {}
       // nome dell'app in cima alla pila: serve alle prove automatiche (e a capire dove siamo)
-      try { mp.runPython('js.window.auriTop = type(s.top).__name__'); document.body.dataset.app = window.auriTop; } catch {}
+      try { mp.runPython('js.window.auriTop = type(s.top).__name__'); if (document.body.dataset.app !== window.auriTop) window.auriLog('app', 'Aperta: ' + window.auriTop); document.body.dataset.app = window.auriTop; } catch {}
       if (window.auriPerf && location.hash.includes('misura') && window.auriOn)
         fetch('/__misura?app=' + window.auriTop + '&step=' + window.auriPerf.step.toFixed(2) + '&max=' + window.auriPerf.max.toFixed(1) + '&draw=' + window.auriPerf.draw.toFixed(2)).catch(() => {});
       if (window.auriPerf) document.body.dataset.perf = ['step', window.auriPerf.step.toFixed(2), 'max', window.auriPerf.max.toFixed(1), 'draw', window.auriPerf.draw.toFixed(2)].join(' ');
       document.body.classList.toggle('off', !window.auriOn);
       $('status').textContent = window.auriOn ? 'AurI OS in esecuzione (MicroPython WebAssembly 1.29)' : 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
     }, 500);
+    py('import auri.gfx as _G; js.window.auriFb = _G._fb is not None');
+    window.auriLog('avvio', window.auriFb ? 'Disegno con framebuf (in C, veloce)' : 'framebuf assente: disegno in Python');
+    let stepFn = null;
+    try { py('js.window.auriStepFn = s.step'); stepFn = window.auriStepFn; window.auriLog('avvio', 'Passo di AurI OS chiamato direttamente (piu veloce)'); } catch (e) { stepFn = null; }
     // contatore delle prestazioni: window.auriPerf = {step: ms medi di s.step(), max, draw: ms del canvas}
     const perf = window.auriPerf = { step: 0, max: 0, draw: 0, n: 0 };
     setInterval(() => {
       const t0 = performance.now();
-      py('s.step()');
+      if (stepFn) { try { stepFn(); } catch (e) { window.auriErr('python', String(e.message || e).split('\n').slice(-3).join(' | ')); } }
+      else py('s.step()');
       const dt = performance.now() - t0;
+      if (dt > 300) window.auriWarn('lento', `Un passo di AurI OS ha richiesto ${Math.round(dt)} ms (app ${window.auriTop || '?'})`);
       perf.step = perf.step * 0.95 + dt * 0.05; perf.max = Math.max(perf.max * 0.999, dt); perf.n++;
     }, 20);
     autoKeys();
   } catch (e) {
     $('status').textContent = 'Errore di avvio';
+    window.auriErr('avvio', 'AurI OS non parte: ' + (e.message || e));
     $('err').textContent = String(e.stack || e);
   }
 })();
