@@ -37,6 +37,8 @@ SD_SCK = 36
 SD_MOSI = 35
 SD_MISO = 37
 SD_CS = 34
+# Fotocamera OV2640 (porta DVP 8 bit): pin da fissare in fase H0, finche' manca CAM_PINS l'app dice "Niente camera".
+# CAM_PINS = {'data': [..8 pin..], 'vsync': , 'href': , 'pclk': , 'xclk': , 'sda': , 'scl': }
 SD_DIR = '/sd/auri/cervello'     # dove stanno modello.bin e tokenizer.bin
 
 TZ_OFFSET = 3600

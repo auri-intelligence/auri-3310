@@ -161,6 +161,7 @@ class Cervello:
         bridge di casa non c'e'.
         """
         if self.locale_ok():
+            # 'auto': sceglie il browser, che sa che scheda grafica c'e' e se e' un telefono
             self.hal.ai_start(model or self.sys.settings['ai_model'] or '')
 
     # --- ascolto ---------------------------------------------------------
@@ -274,6 +275,8 @@ class Cervello:
             try:
                 r = self.hal.request('POST', cfg['bridge_url'] + '/v1/chat', body, cfg.get('token'))
             except Exception:
+                r = None
+            if r is None or r.get('error') == 'no_llm':
                 from auri.i18n import t
                 # Il bridge di casa e' spento: se qui c'e' un cervello si continua con quello,
                 # cosi' chi apre il simulatore non sbatte contro un errore che non lo riguarda.
@@ -286,7 +289,10 @@ class Cervello:
                         # resta in tasca, parte da sola appena il modello e' pronto
                         self.sospesa = testo
                     return True
-                self.error = t('bridge_down')
+                if r is not None:
+                    self.error = pulisci(r.get('reply') or '') or t('bridge_err')
+                else:
+                    self.error = t('bridge_down')
                 self.done = True
                 return True
             self.session = r.get('session', self.session)

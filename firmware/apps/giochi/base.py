@@ -13,8 +13,9 @@ PHONE_BIG = ('..#####..', '.#######.', '##.....##', '##.....##', '##.....##', '#
 
 class Game(App):
     key = 'gioco'
-    ENERGY = 3
-    ROLL = True       # with an empty battery the 3310 still survives 9 impacts out of 10
+    ENERGY = 2
+    ROLL = True       # with an empty battery the 3310 still survives 1 impact out of 4
+    LUCK = 25         # percent
     HUD = True
 
     def __init__(self, sys):
@@ -85,7 +86,7 @@ class Game(App):
             self.pop(x, y, '+%d' % n)
 
     def charge(self, x, y):
-        if self.energy < 5:
+        if self.energy < 3:
             self.energy += 1
         self.pop(x, y, '+' + t('g_batt'))
         self.sys.play('c6:32 e6:32 g6:32 c7:16', 200)
@@ -101,7 +102,7 @@ class Game(App):
             self.beep(220, 40)
             self.pop(x, y, 'TOC!')
             return True
-        if (self.ROLL if roll is None else roll) and self.r(10) < 9:
+        if (self.ROLL if roll is None else roll) and self.r(100) < self.LUCK:
             self.flash = 2
             self.sys.vibrate(120)
             self.sys.play('g4:32 c5:32 g5:16', 220)

@@ -148,8 +148,9 @@ def Impostazioni(sys):
                     refresh(sys)
                 return run
             cur = st['ai_model']
-            sys.push(Menu(sys, t('ai_model'), [(('>' if k == cur else ' ') + '%s %dMB' % (nome, mb), pick(k))
-                                               for k, nome, mb in lista]))
+            voci = [(('>' if cur == 'auto' else ' ') + t('ai_auto'), pick('auto'))]
+            voci += [(('>' if k == cur else ' ') + '%s %dMB' % (nome, mb), pick(k)) for k, nome, mb in lista]
+            sys.push(Menu(sys, t('ai_model'), voci))
 
         def voce():
             st.set(ai_voice=not st['ai_voice'])
@@ -194,6 +195,10 @@ def Impostazioni(sys):
                 sys.toast(t('done'))
         sys.push(Confirm(sys, t('reset_q'), done))
 
+    def connessioni():
+        from apps.connessioni import menu
+        sys.push(menu(sys))
+
     items = [
         ('1 ' + t('profiles'), submenu(sys, t('profiles'), profiles)),
         ('2 ' + t('tones'), submenu(sys, t('tones'), tones)),
@@ -204,5 +209,6 @@ def Impostazioni(sys):
         ('7 ' + t('language'), language),
         ('8 ' + t('info'), info),
         ('9 ' + t('reset'), reset),
+        ('0 ' + t('connections'), connessioni),
     ]
     return Menu(sys, t('settings'), items)

@@ -1,5 +1,6 @@
 from auri import keys
-from auri.ui import App, header, softkey
+from auri.ui import App, header, softkey, snake_load
+from auri.net import Richiesta
 from auri.gfx import W, H, wrap
 from auri.i18n import t
 from auri.t9 import MultiTap
@@ -109,27 +110,27 @@ class Classifica(App):
         self.world = False
         self.msg = '' if self.url else t('g_world_soon')
         self.pos = 0
+        self.req = None           # richiesta in corso: lo schermo resta vivo (snake che gira)
         self.todo = 'name' if self.url and score > 0 else ('get' if self.url else '')
         if self.todo == 'name' and valid(player_name(sys)):
             self.todo = 'send'
 
-    def _net(self):
-        hal, body = self.sys.hal, None
-        try:
-            name = player_name(self.sys)
-            # GET only: a simple request needs no CORS preflight, which Apps Script cannot answer
-            q = 'gioco=' + self.game
-            if self.todo == 'send' and valid(name):
-                q += '&nome=%s&punti=%d&firma=%s' % (quote(name), self.score,
-                                                    sign(self.game, name, self.score, self.sys.config.get('scores_key', '')))
-            r = hal.request('GET', self.url + ('&' if '?' in self.url else '?') + q)
-            top = (r or {}).get('top') if isinstance(r, dict) else None
-            if top:
-                self.rows = [[int(e[1]), str(e[0])[:10]] for e in top[:10]]
-                self.world = True
-            self.msg = ''
-        except Exception:
-            self.msg = t('g_net_err')
+    def _start(self):
+        name = player_name(self.sys)
+        # GET only: a simple request needs no CORS preflight, which Apps Script cannot answer
+        q = 'gioco=' + self.game
+        if self.todo == 'send' and valid(name):
+            q += '&nome=%s&punti=%d&firma=%s' % (quote(name), self.score,
+                                                sign(self.game, name, self.score, self.sys.config.get('scores_key', '')))
+        self.req = Richiesta(self.sys.hal, 'GET', self.url + ('&' if '?' in self.url else '?') + q)
+
+    def _end(self):
+        r, self.req = self.req, None
+        top = r.dati.get('top') if isinstance(r.dati, dict) else None
+        if top:
+            self.rows = [[int(e[1]), str(e[0])[:10]] for e in top[:10]]
+            self.world = True
+        self.msg = t('g_net_err') if r.errore else ''
 
     def tick(self, now):
         if self.todo == 'name':
@@ -137,12 +138,13 @@ class Classifica(App):
             self.sys.push(NomeInput(self.sys, lambda n: None))
             return True
         if self.todo and type(self.sys.top) is Classifica:
-            if self.msg != t('g_sending'):
-                self.msg = t('g_sending')
-                return True
-            self._net()
+            self._start()
             self.todo = ''
             return True
+        if self.req:
+            if self.req.poll():
+                self._end()
+            return True          # ridisegna lo snake
         return False
 
     def on_key(self, k):
@@ -152,9 +154,14 @@ class Classifica(App):
         elif k in (keys.DOWN, '8'):
             self.pos = min(max(0, n - 3), self.pos + 1)
         elif k in (keys.NAVI, keys.C):
+            self.req = None          # si puo' uscire anche mentre aspetta: il risultato si perde
             self.sys.pop()
 
     def draw(self, g):
+        if self.req or self.todo == 'send' or self.todo == 'get':
+            header(g, t('g_world'))
+            snake_load(g, self.sys.hal.ticks_ms(), 25, t('g_sending'))
+            return
         header(g, t('g_world') if self.world else t('g_rank'))
         lines = ['%2d %-6s%d' % (i + 1, e[1][:6], e[0]) for i, e in enumerate(self.rows)]
         if not lines:

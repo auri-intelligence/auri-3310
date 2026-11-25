@@ -150,7 +150,7 @@ class Incastro(Game):
                 self._spawn()
             return
         self.fall += 1
-        if self.fall >= max(2, 12 - self.lines // 4):
+        if self.fall >= max(1, 9 - self.lines // 3):
             self.fall = 0
             if self._fits(self.cells, self.px, self.py + 1):
                 self.py += 1

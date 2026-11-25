@@ -14,7 +14,7 @@ class Volo(Game):
         self.vy = 0.0
         self.walls = []   # [x, gap_top, gap_h, broken_from, broken_to, passed, batt]
         self.dist = 0
-        self.speed = 1.2
+        self.speed = 1.5
 
     def control(self, k):
         if k in (keys.NAVI, keys.UP, '2', '5', '8', keys.DOWN, '4', '6'):
@@ -33,11 +33,11 @@ class Volo(Game):
             self.burst(PX + 2, H - 1, 4, 2)
             self.beep(300, 15)
         self.dist += 1
-        self.speed = min(2.6, 1.2 + self.dist / 900)
+        self.speed = min(3.2, 1.5 + self.dist / 500)
         if not self.walls or self.walls[-1][0] < W - 30:
-            gap = max(14, 20 - self.dist // 400)
+            gap = max(11, 17 - self.dist // 250)
             gt = TOP + 2 + self.r(H - TOP - gap - 4)
-            self.walls.append([W + 2.0, gt, gap, 0, 0, False, self.r(5) == 0])
+            self.walls.append([W + 2.0, gt, gap, 0, 0, False, self.r(8) == 0])
         y = int(self.y)
         for w in self.walls:
             w[0] -= self.speed

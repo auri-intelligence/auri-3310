@@ -20,7 +20,7 @@ class Catapulta(Game):
 
     def _level(self):
         self.level += 1
-        self.shots = 3
+        self.shots = 2
         self.ball = None
         self.crates = []
         cols = min(5, 2 + self.level // 2)

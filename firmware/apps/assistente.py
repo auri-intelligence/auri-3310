@@ -250,8 +250,9 @@ class Assistente(App):
                     self.state = 'load'
                 return run
             cur = st['ai_model']
-            sys.push(Menu(sys, t('ai_model'), [(('>' if k == cur else ' ') + '%s %dMB' % (name, mb), pick(k))
-                                               for k, name, mb in lista]))
+            voci = [(('>' if cur == 'auto' else ' ') + t('ai_auto'), pick('auto'))]
+            voci += [(('>' if k == cur else ' ') + '%s %dMB' % (name, mb), pick(k)) for k, name, mb in lista]
+            sys.push(Menu(sys, t('ai_model'), voci))
 
         def motore():
             def pick(v):

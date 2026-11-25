@@ -6,6 +6,7 @@ Claude runs through the Claude Agent SDK, which is the Claude Code engine itself
 same login, CLAUDE.md, MCP servers, skills and permission modes.
 """
 import argparse
+import atexit
 import asyncio
 import base64
 import io
@@ -226,11 +227,14 @@ def home_list():
     return {'entities': out}
 
 
-def home_toggle(req):
+def home_toggle(req, action='toggle'):
+    """action: toggle, turn_on o turn_off (il cervello locale dice esplicitamente on/off)."""
     eid = req['id']
     if eid not in cfg.get('entities', []):
         raise PermissionError(msg(req, 'not_allowed'))
-    ha('POST', '/api/services/homeassistant/toggle', {'entity_id': eid})
+    if action not in ('toggle', 'turn_on', 'turn_off'):
+        action = 'toggle'
+    ha('POST', '/api/services/homeassistant/' + action, {'entity_id': eid})
     return {'message': msg(req, 'done')}
 
 
@@ -278,29 +282,71 @@ def llm_up(timeout=2):
         return False
 
 
-def llm_spawn():
-    """Avvia llama-server da bridge/models/llm (scaricato da setup_llm), una volta sola."""
-    global llm_proc
-    if llm_proc and llm_proc.poll() is None:
-        return
+def llm_files():
+    """Percorsi di llama-server e del modello, o None se mancano (setup_llm non ancora fatto)."""
     exe = cfg.get('llm_bin') or os.path.join('models', 'llm', 'bin',
                                              'llama-server.exe' if os.name == 'nt' else 'llama-server')
     model = cfg.get('llm_model') or ''
+    if not model:
+        return None
     exe = exe if os.path.isabs(exe) else os.path.join(HERE, exe)
     model = model if os.path.isabs(model) else os.path.join(HERE, model)
-    if not (os.path.exists(exe) and os.path.exists(model)):
-        return
+    return (exe, model) if os.path.exists(exe) and os.path.exists(model) else None
+
+
+def llm_local_host():
+    return (urllib.parse.urlparse(llm_url()).hostname or '') in ('127.0.0.1', 'localhost', '::1')
+
+
+llm_lock = threading.Lock()
+llm_failed_at = 0
+
+
+def llm_stop():
+    """Spegne llama-server quando il bridge si chiude: niente processi orfani che tengono porta e RAM."""
+    if llm_proc and llm_proc.poll() is None:
+        llm_proc.terminate()
+        try:
+            llm_proc.wait(5)
+        except Exception:
+            llm_proc.kill()
+
+
+atexit.register(llm_stop)
+
+
+def llm_spawn():
+    """Avvia llama-server da bridge/models/llm (scaricato da setup_llm), una volta sola.
+    Il lock fa aspettare le altre richieste invece di avviare un secondo server sulla stessa porta."""
+    global llm_failed_at
+    with llm_lock:
+        if llm_up(1):
+            return
+        if not (llm_proc and llm_proc.poll() is None):
+            files = llm_files()
+            if not files or not llm_local_host() or time.time() - llm_failed_at < 30:
+                return
+            _spawn(*files)
+        for _ in range(90):              # il modello ci mette qualche secondo a salire
+            if llm_up(1):
+                return
+            if llm_proc.poll() is not None:   # morto all'avvio: niente attese inutili
+                llm_failed_at = time.time()
+                print('llama-server terminato (codice %s): vedi models/llm/llama-server.log'
+                      % llm_proc.returncode, flush=True)
+                return
+            time.sleep(1)
+
+
+def _spawn(exe, model):
+    global llm_proc
     port = str(urllib.parse.urlparse(llm_url()).port or 8080)
     # --jinja: usa il template della chat del modello, se no 'enable_thinking' non viene ascoltato
     cmd = [exe, '-m', model, '--host', '127.0.0.1', '--port', port,
            '-c', str(cfg.get('llm_ctx', 4096)), '--alias', 'auri', '--jinja']
     print('avvio llama-server:', ' '.join(cmd), flush=True)
-    llm_proc = subprocess.Popen(cmd, cwd=os.path.dirname(exe),
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for _ in range(60):          # il modello ci mette qualche secondo a salire
-        if llm_up(1):
-            return
-        time.sleep(1)
+    log = open(os.path.join(os.path.dirname(model), 'llama-server.log'), 'ab')
+    llm_proc = subprocess.Popen(cmd, cwd=os.path.dirname(exe), stdout=log, stderr=subprocess.STDOUT)
 
 
 def llm_ready():
@@ -313,11 +359,12 @@ def llm_ready():
 
 
 def llm_prompt(req):
-    p = assist_prompt(req)
-    if cfg.get('entities'):
+    p = assist_prompt(req, tools=False)
+    if cfg.get('entities') and cfg.get('ha_url'):
         # I modelli piccoli sbagliano le chiamate a funzione: qui basta una parola in fondo alla frase.
-        p += (' To switch a home device, end your answer with [CASA on <id>] or [CASA off <id>] using one of '
-              'these ids: %s. Write nothing else about it.' % ', '.join(cfg['entities']))
+        p += (' Only when the user explicitly asks to switch a home device on or off, end your answer with '
+              '[CASA on <id>] or [CASA off <id>] using one of these ids: %s. Never write it otherwise.'
+              % ', '.join(cfg['entities']))
     return p
 
 
@@ -333,17 +380,27 @@ def llm_house(req, text):
         cmd = out[i + 5:j].split()
         out = (out[:i] + out[j + 1:]).strip()
         eid = cmd[-1] if cmd else ''
+        verbo = cmd[0].lower() if len(cmd) > 1 else ''
+        action = {'on': 'turn_on', 'off': 'turn_off'}.get(verbo, 'toggle')
+        if eid not in cfg.get('entities', []) or not cfg.get('ha_url'):
+            # i modelli piccoli a volte inventano un comando anche a un semplice "ciao":
+            # un dispositivo che non esiste si toglie in silenzio, non e' un errore da dire
+            print('llm: comando casa ignorato:', cmd, flush=True)
+            continue
         try:
-            note = home_toggle(dict(req, id=eid))['message']
+            done = home_toggle(dict(req, id=eid), action)['message']
+            if not out:
+                note = done
         except Exception as e:
+            # se il comando fallisce lo si dice sempre, anche se il modello ha gia' detto "fatto"
             note = str(e) if isinstance(e, PermissionError) else msg(req, 'error')
-    return (out + (' ' + note if note and not out else '')).strip() or note
+    return (out + ' ' + note).strip() if note else out
 
 
 def llm_assist(req):
     sid = req.get('session') or 'l-' + uuid.uuid4().hex[:8]
     if not llm_ready():
-        return {'reply': msg(req, 'no_llm'), 'session': sid}
+        return {'reply': msg(req, 'no_llm'), 'error': 'no_llm', 'session': sid}
     hist = llm_sessions.setdefault(sid, [])
     msgs = ([{'role': 'system', 'content': llm_prompt(req)}] + hist
             + [{'role': 'user', 'content': req.get('text', '')}])
@@ -367,16 +424,22 @@ def llm_assist(req):
     return {'reply': reply or msg(req, 'error'), 'session': sid}
 
 
-def assist_engine():
+def assist_engine(up=None):
     """auto = il cervello locale se c'e', altrimenti Gemini; local o gemini per sceglierlo a mano."""
     want = cfg.get('assist_engine', 'auto')
     if want in ('local', 'llama', 'llm'):
         return 'local'
     if want == 'gemini':
         return 'gemini'
-    if llm_up() or (cfg.get('llm_autostart', True) and cfg.get('llm_model')):
-        return 'local'
-    return 'gemini' if os.environ.get(cfg.get('gemini_key_env', 'GEMINI_API_KEY'), '') else 'local'
+    return 'local' if llm_available(up) else (
+        'gemini' if os.environ.get(cfg.get('gemini_key_env', 'GEMINI_API_KEY'), '') else 'local')
+
+
+def llm_available(up=None):
+    """Il cervello locale c'e' davvero: o risponde, o si puo' avviare (file presenti, host locale)."""
+    if up is None:
+        up = llm_up(0.5)
+    return up or bool(cfg.get('llm_autostart', True) and llm_local_host() and llm_files())
 
 
 # Gemini: the central AurI assistant (Claude stays in the Claude console) ----
@@ -392,12 +455,12 @@ MSG['no_gemini'] = ('Gemini non configurato: imposta la chiave sul bridge.',
                     'Gemini nao configurado: defina a chave no bridge.')
 
 
-def assist_prompt(req):
+def assist_prompt(req, tools=True):
     p = ("Your name is AurI and you have no other name: you are the voice assistant built into this phone, "
          "not any brand's assistant. Your answer is read aloud and shown on a 14-column display. Reply in "
          "%s with one or two very short spoken sentences, plain text only, no markdown, lists or emoji."
          % LANG_NAMES[lang_of(req)])
-    if cfg.get('entities'):
+    if tools and cfg.get('entities'):
         p += (" To switch a home device on or off call home_toggle with one of these ids: %s."
               % ', '.join(cfg['entities']))
     return p
@@ -559,9 +622,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {'error': msg(None, 'unauthorized')})
         try:
             if self.path == '/v1/info':
+                up = llm_up(0.5)
                 return self._send(200, {'version': claude_version(), 'plan': cfg.get('plan', 'Claude'),
-                                        'cwd': cfg['cwd'], 'assist': assist_engine(),
-                                        'llm': llm_up(0.5)})
+                                        'cwd': cfg['cwd'], 'assist': assist_engine(up), 'llm': up})
             if self.path == '/v1/home':
                 return self._send(200, home_list())
             self._send(404, {'error': msg(None, 'not_found')})

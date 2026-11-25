@@ -222,7 +222,15 @@
     hear: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
   });
 
-  window.auriAiStart = key => { start(key || st.key); return ''; };
+  window.auriAiStart = key => {
+    if (key === 'auto') {
+      store.set('auri.cervello.modello', '');
+      st.key = (MOBILE || f16 === false) ? 'mini' : DEFAULT;
+      key = st.key;
+    }
+    start(key || st.key);
+    return '';
+  };
 
   window.auriAiAsk = (messagesJson, optsJson) => {
     if (st.phase !== 'ready') return 'non pronto';

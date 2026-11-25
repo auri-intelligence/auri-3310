@@ -21,9 +21,9 @@ class SaliSali(Game):
     def _more(self):
         while self.top_y > TOP - 10:
             h = int(self.height)
-            gap = 7 + min(9, h // 250) + self.r(4)
+            gap = 8 + min(11, h // 150) + self.r(5)
             self.top_y -= gap
-            w = max(8, 16 - h // 300)
+            w = max(7, 14 - h // 200)
             k = 1 if self.r(9) == 0 else (2 if self.r(6) == 0 and h > 150 else 0)
             self.plats.append([self.r(W - w), self.top_y, w, k, self.r(14) == 0])
 

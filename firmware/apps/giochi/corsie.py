@@ -14,7 +14,7 @@ class Corsie(Game):
         self.lane = 1
         self.x = float(LANES[1])
         self.obs = []   # [lane, y, kind]  kind: 0 crate, 1 coin, 2 battery
-        self.speed = 1.4
+        self.speed = 1.7
         self.scroll = 0
         self.jump = 0
         self.gap = 0
@@ -32,7 +32,7 @@ class Corsie(Game):
 
     def update(self):
         self.scroll += self.speed
-        self.speed = min(3.2, 1.4 + self.frame / 700)
+        self.speed = min(4.0, 1.7 + self.frame / 400)
         if self.frame % 10 == 0:
             self.add(1)
         tx = LANES[self.lane]
@@ -41,7 +41,7 @@ class Corsie(Game):
             self.jump -= 1
         self.gap -= self.speed
         if self.gap <= 0:
-            self.gap = 16 + self.r(12)
+            self.gap = max(9, 14 - self.frame // 400) + self.r(9)
             free = self.r(3)
             for ln in range(3):
                 if ln != free and self.r(3) == 0:

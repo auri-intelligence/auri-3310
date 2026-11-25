@@ -57,13 +57,20 @@ class Home(App):
 
     def draw(self, g):
         hal = self.sys.hal
-        rssi = hal.wifi_level()
-        for i in range(4):
+        st = self.sys.settings
+        rssi = 0 if st['aereo'] or not st['wifi'] else hal.wifi_level()
+        if st['aereo']:
+            g.icon(('..#..', '..#..', '.###.', '#####', '..#..', '..#..', '.###.'), 2, 1)
+        for i in range(4 if not st['aereo'] else 0):
             h = 2 + i * 2
             if i < rssi:
                 g.fill_rect(i * 3, 8 - h, 2, h)
             else:
                 g.pixel(i * 3, 7)
+        if st['bt'] and not st['aereo']:
+            g.icon(('.#.', '.##', '##.', '.#.', '##.', '.##', '.#.'), 14, 1)
+        if st['gps'] and not st['aereo']:
+            g.icon(('.#.', '#.#', '#.#', '.#.', '.#.'), 19, 2)
         pct, chg = self.sys.battery
         g.rect(W - 13, 1, 11, 7)
         g.vline(W - 2, 3, 3)
@@ -130,6 +137,10 @@ def main_menu(sys):
         from apps.sensori import Sensori
         sys.push(Sensori(sys))
 
+    def open_camera():
+        from apps.camera import Camera
+        sys.push(Camera(sys))
+
     def open_settings():
         from apps.impostazioni import Impostazioni
         sys.push(Impostazioni(sys))
@@ -148,7 +159,7 @@ def main_menu(sys):
     items += [
         (t('home'), icons.HOME, open_casa),
         (t('games'), icons.GAMES, open_giochi), (t('pet'), icons.PET, open_pet),
-        (t('sensors'), icons.SENSORS, open_sensori), (t('settings'), icons.SETTINGS, open_settings),
+        (t('camera'), icons.CAMERA, open_camera), (t('sensors'), icons.SENSORS, open_sensori), (t('settings'), icons.SETTINGS, open_settings),
         (t('info'), icons.INFO, open_info),
     ]
     return IconMenu(sys, items)

@@ -68,6 +68,9 @@ class PCHal:
     def wifi_level(self):
         return 4
 
+    def net_info(self):
+        return {'online': True, 'tipo': 'wifi', 'eff': '', 'bars': 4, 'down': 0, 'bt': 0, 'ssid': 'PC'}
+
     def battery(self):
         return self.batt, self.charging
 
@@ -94,6 +97,10 @@ class PCHal:
 
     def voice_poll(self):
         return {'error': 'Voce solo nel simulatore web'}
+
+    # --- fotocamera: nella finestra del PC non c'e' (si usa il simulatore web con la webcam) ---
+    def cam_ok(self):
+        return False
 
     def ai_ok(self):
         # Nella finestra del PC il cervello sta sul bridge (llama.cpp o Gemini), non qui.

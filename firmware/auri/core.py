@@ -1,7 +1,7 @@
 from auri import keys
 from auri.gfx import Canvas, W, wrap
 from auri.settings import Settings
-from auri.sound import Player, NOTIFY, WARN
+from auri.sound import Player, NOTIFY, WARN, KEY_TONE
 
 VERSION = '0.2.0'
 
@@ -44,12 +44,23 @@ class System:
 
     def pop(self):
         if len(self.stack) > 1:
-            self.stack.pop()
+            self._chiudi(self.stack.pop())
         self.dirty = True
 
     def home(self):
-        del self.stack[1:]
+        while len(self.stack) > 1:
+            self._chiudi(self.stack.pop())
         self.dirty = True
+
+    @staticmethod
+    def _chiudi(app):
+        # le app che tengono acceso qualcosa (es. la fotocamera) lo spengono qui
+        f = getattr(app, 'close', None)
+        if f:
+            try:
+                f()
+            except Exception:
+                pass
 
     @property
     def top(self):
@@ -155,7 +166,7 @@ class System:
                 if not self.off:
                     self.light()
                     if self.settings['keytones'] and self.settings['volume'] and k != keys.POWER:
-                        self.hal.beep(1400, 18, self.settings['volume'])
+                        self.hal.beep(KEY_TONE[0], KEY_TONE[1], self.settings["volume"])
                     self.top.on_key(k)
                 self.dirty = True
             elif kind == 'up':

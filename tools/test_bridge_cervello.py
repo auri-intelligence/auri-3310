@@ -52,7 +52,7 @@ def finto_server(risposta, chiamate):
 
 def prepara(risposta, entities=()):
     b.cfg = {'llm_url': 'http://127.0.0.1:8080', 'assist_engine': 'local', 'language': 'it',
-             'entities': list(entities), 'llm_autostart': False}
+             'entities': list(entities), 'llm_autostart': False, 'ha_url': 'http://ha.finto:8123'}
     b.llm_sessions.clear()
     chiamate = []
     b.urllib.request.urlopen = finto_server(risposta, chiamate)
@@ -96,19 +96,31 @@ def test_ragionamento_tolto():
 def test_casa():
     fatti = []
 
-    def finto_toggle(req):
-        fatti.append(req['id'])
+    def finto_toggle(req, action='toggle'):
+        if req['id'] == 'light.rotta':
+            raise OSError('Home Assistant non risponde')
+        fatti.append((action, req['id']))
         return {'message': 'Fatto'}
     vero, b.home_toggle = b.home_toggle, finto_toggle
     try:
         prepara('Accendo la luce. [CASA on light.soggiorno]', entities=['light.soggiorno'])
         out = b.llm_assist({'text': 'accendi la luce', 'language': 'it'})
         assert out['reply'] == 'Accendo la luce.', out
-        assert fatti == ['light.soggiorno'], fatti
+        assert fatti == [('turn_on', 'light.soggiorno')], fatti
         # solo il comando, senza frase: resta il messaggio del bridge
         prepara('[CASA off light.soggiorno]', entities=['light.soggiorno'])
         out = b.llm_assist({'text': 'spegni', 'language': 'it'})
         assert out['reply'] == 'Fatto', out
+        assert fatti[-1] == ('turn_off', 'light.soggiorno'), fatti   # "spegni" spegne, non inverte
+        # comando rifiutato: l'errore si sente anche se il modello ha gia' detto "fatto"
+        prepara('Accendo. [CASA on light.rotta]', entities=['light.soggiorno', 'light.rotta'])
+        out = b.llm_assist({'text': 'accendi', 'language': 'it'})
+        assert out['reply'].startswith('Accendo. ') and out['reply'] != 'Accendo.', out
+        # comando inventato su un dispositivo che non c'e': tolto senza dire niente
+        n = len(fatti)
+        prepara('Ciao! [CASA on light.inventata]', entities=['light.soggiorno'])
+        out = b.llm_assist({'text': 'ciao', 'language': 'it'})
+        assert out['reply'] == 'Ciao!' and len(fatti) == n, out
         # parentesi aperta e mai chiusa: non deve far saltare niente
         prepara('Ecco [CASA on light', entities=['light.soggiorno'])
         out = b.llm_assist({'text': 'accendi', 'language': 'it'})

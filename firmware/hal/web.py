@@ -39,7 +39,29 @@ class WebHal:
         js.auriBeep(freq, ms, vol)
 
     def wifi_level(self):
-        return 4
+        try:
+            return int(json.loads(str(js.auriNet()))['bars'])
+        except Exception:
+            return 4
+
+    # --- connessioni (web/auri-conn.js): rete vera del dispositivo, Bluetooth del browser, GPS ---
+    def net_info(self):
+        return json.loads(str(js.auriNet()))
+
+    def bt_set(self, on):
+        pass        # il browser non lascia accendere/spegnere la radio: si ricorda solo la scelta
+
+    def wifi_set(self, on):
+        pass
+
+    def loc_start(self):
+        js.auriLocStart()
+
+    def loc_stop(self):
+        js.auriLocStop()
+
+    def loc_poll(self):
+        return json.loads(str(js.auriLocPoll()))
 
     def battery(self):
         # a stale cached page may lack the simulated battery: report full instead of crashing
@@ -99,6 +121,31 @@ class WebHal:
     def ai_stop(self):
         js.auriAiStop()
 
+    # --- fotocamera: telefono -> posteriore, computer -> webcam (web/auri-cam.js) ---
+    def cam_ok(self):
+        try:
+            return bool(json.loads(str(js.auriCamInfo()))['ok'])
+        except Exception:
+            return False
+
+    def cam_start(self):
+        js.auriCamStart()
+
+    def cam_stop(self):
+        js.auriCamStop()
+
+    def cam_switch(self):
+        js.auriCamSwitch()
+
+    def cam_mode(self, m):
+        js.auriCamMode(m)
+
+    def cam_poll(self):
+        r = json.loads(str(js.auriCamPoll()))
+        f = r.pop('frame', '')
+        r['frame'] = ubinascii.unhexlify(f) if f else None
+        return r
+
     # --- voce del browser: ascolto (push-to-talk) e lettura ad alta voce ---
     def hear_start(self, lang='it'):
         try:
@@ -142,6 +189,21 @@ class WebHal:
         if r.startswith('ERR '):
             raise OSError(r[4:])
         return json.loads(r)
+
+    def request_start(self, method, url, body=None, token=None):
+        return int(js.auriFetch(method, url, json.dumps(body) if body is not None else '', token or ''))
+
+    def request_poll(self, rid):
+        """None = ancora in corso; altrimenti (risultato, errore)."""
+        r = str(js.auriFetchPoll(rid))
+        if not r:
+            return None
+        if r.startswith('ERR '):
+            return None, r[4:]
+        try:
+            return json.loads(r[3:]), ''
+        except ValueError:
+            return None, 'json'
 
     def load(self, name, default):
         v = str(js.auriLoad(name))

@@ -7,6 +7,8 @@ import random
 
 from hal import board
 
+REQ_TIMEOUT_S = 25
+
 W, H = 84, 48
 
 
@@ -145,6 +147,32 @@ class ESP32Hal:
         rssi = self.wlan.status('rssi')
         return 4 if rssi > -55 else 3 if rssi > -65 else 2 if rssi > -75 else 1
 
+    def net_info(self):
+        ok = self.wlan.active() and self.wlan.isconnected()
+        try:
+            ssid = self.wlan.config('ssid') if ok else ''
+        except Exception:
+            ssid = ''
+        try:
+            import bluetooth   # noqa: F401
+            bt = 1
+        except ImportError:
+            bt = 0
+        return {'online': ok, 'tipo': 'wifi' if ok else '', 'eff': '', 'bars': self.wifi_level(),
+                'down': 0, 'bt': bt, 'ssid': ssid}
+
+    def wifi_set(self, on):
+        self.wlan.active(bool(on))
+
+    def bt_set(self, on):
+        try:
+            import bluetooth
+            bluetooth.BLE().active(bool(on))
+        except Exception:
+            pass
+
+    # niente loc_*: il Nokia vero non ha un GPS (l'app lo dice)
+
     def battery(self):
         mv = sum(self.adc.read_uv() for _ in range(8)) // 8000 * board.BAT_DIVIDER
         pct = (mv - board.BAT_EMPTY_MV) * 100 // (board.BAT_FULL_MV - board.BAT_EMPTY_MV)
@@ -215,6 +243,52 @@ class ESP32Hal:
         return (board.SD_DIR + '/' + modello, board.SD_DIR + '/' + tok)
 
     # --- cervello locale (modulo C auri_llm + pesi dalla microSD) --------
+    # --- fotocamera del Nokia (OV2640 sulla porta DVP, modulo micropython-camera-API) ---
+    # Il sensore da' gia' la scala di grigi a 160x120: qui si riduce a 84x48 e si fa il dithering.
+    def cam_ok(self):
+        if getattr(self, '_cam_ok', None) is None:
+            try:
+                import camera   # noqa: F401
+                self._cam_ok = hasattr(board, 'CAM_PINS')
+            except ImportError:
+                self._cam_ok = False
+        return self._cam_ok
+
+    def cam_start(self):
+        self._cam_err, self._cam_modo, self._cam_buf = '', 0, bytearray(504)
+        try:
+            from camera import Camera, PixelFormat, FrameSize
+            p = board.CAM_PINS
+            self._cam = Camera(data_pins=p['data'], vsync_pin=p['vsync'], href_pin=p['href'],
+                               sda_pin=p['sda'], scl_pin=p['scl'], pclk_pin=p['pclk'], xclk_pin=p['xclk'],
+                               xclk_freq=20_000_000, pixel_format=PixelFormat.GRAYSCALE,
+                               frame_size=FrameSize.QQVGA, fb_count=2)
+        except Exception:
+            self._cam, self._cam_err = None, 'no_cam'
+
+    def cam_stop(self):
+        if getattr(self, '_cam', None):
+            try:
+                self._cam.deinit()
+            except Exception:
+                pass
+        self._cam = None
+
+    def cam_switch(self):
+        pass        # una sola fotocamera
+
+    def cam_mode(self, m):
+        self._cam_modo = m
+
+    def cam_poll(self):
+        cam = getattr(self, '_cam', None)
+        if not cam:
+            return {'on': False, 'busy': False, 'err': getattr(self, '_cam_err', 'no_cam'), 'facing': 'environment', 'frame': None}
+        from auri.dither import da_grigi
+        img = cam.capture()
+        f = da_grigi(img, 160, 120, self._cam_modo, False, self._cam_buf) if img else None
+        return {'on': True, 'busy': False, 'err': '', 'facing': 'environment', 'frame': f}
+
     def ai_ok(self):
         if self._llm is None:
             try:
@@ -316,7 +390,13 @@ class ESP32Hal:
         h = {'Content-Type': 'application/json'}
         if token:
             h['Authorization'] = 'Bearer ' + token
-        r = requests.request(method, url, data=json.dumps(body) if body is not None else None, headers=h)
+        # timeout: se il bridge tarda (modello che si carica) il telefono non resta bloccato per minuti;
+        # l'eccezione arriva all'app, che mostra "bridge non raggiungibile"
+        try:
+            r = requests.request(method, url, data=json.dumps(body) if body is not None else None,
+                                 headers=h, timeout=REQ_TIMEOUT_S)
+        except TypeError:       # requests vecchio, senza timeout
+            r = requests.request(method, url, data=json.dumps(body) if body is not None else None, headers=h)
         try:
             return r.json()
         finally:

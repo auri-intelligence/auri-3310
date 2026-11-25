@@ -37,7 +37,7 @@ class Rompimuro(Game):
                 continue
             self.bricks[i] = 2 if (L > 1 and r == 0) else 1
         self.bx, self.by = W / 2, PY - 6.0
-        sp = min(2.2, 1.3 + L * 0.15)
+        sp = min(2.8, 1.6 + L * 0.2)
         self.vx, self.vy = sp * (0.6 if self.r(2) else -0.6), -sp
         self.stuck = 20
 

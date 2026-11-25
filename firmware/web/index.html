@@ -188,12 +188,14 @@ if (!window.AURI_LOCAL) {
 </aside>
 
 <script>document.write('<script src="auri-io.js?v=' + Date.now() + '"><\/script>');</script>
+<script>document.write('<script src="auri-conn.js?v=' + Date.now() + '"><\/script>');</script>
+<script>document.write('<script src="auri-cam.js?v=' + Date.now() + '"><\/script>');</script>
 <script>document.write('<script src="auri-llm.js?v=' + Date.now() + '"><\/script>');</script>
 <script type="module">
 const MP_URL = 'https://cdn.jsdelivr.net/npm/@micropython/micropython-webassembly-pyscript@1.29.0-6/micropython.mjs';
 const FILES = [
-  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py', 'auri/settings.py', 'auri/sound.py', 'auri/icons.py', 'auri/cervello.py',
-  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py', 'apps/sensori.py', 'apps/assistente.py', 'apps/impostazioni.py', 'apps/power.py', 'apps/pet.py',
+  'auri/__init__.py', 'auri/core.py', 'auri/font.py', 'auri/gfx.py', 'auri/keys.py', 'auri/t9.py', 'auri/ui.py', 'auri/i18n.py', 'auri/settings.py', 'auri/sound.py', 'auri/icons.py', 'auri/cervello.py', 'auri/dither.py', 'auri/net.py',
+  'apps/__init__.py', 'apps/home.py', 'apps/claude.py', 'apps/casa.py', 'apps/snake.py', 'apps/sensori.py', 'apps/assistente.py', 'apps/impostazioni.py', 'apps/power.py', 'apps/pet.py', 'apps/camera.py', 'apps/connessioni.py',
   'apps/giochi/__init__.py', 'apps/giochi/base.py', 'apps/giochi/icone.py', 'apps/giochi/classifica.py', 'apps/giochi/volo.py', 'apps/giochi/corsie.py', 'apps/giochi/incastro.py', 'apps/giochi/rompimuro.py', 'apps/giochi/trefila.py', 'apps/giochi/salisali.py', 'apps/giochi/catapulta.py',
   'hal/__init__.py', 'hal/web.py', 'config.example.json',
 ];
@@ -310,6 +312,27 @@ window.auriRequest = (method, url, body, token) => {
   } catch (e) { return 'ERR ' + (e.message || e); }
 };
 
+// la stessa richiesta senza bloccare: il telefono continua a disegnare (snake di caricamento) mentre aspetta
+const pending = new Map(); let reqId = 0;
+window.auriFetch = (method, url, body, token) => {
+  const id = ++reqId;
+  pending.set(id, '');
+  const h = {};
+  if (body) h['Content-Type'] = 'application/json';
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 20000);
+  fetch(url, { method, headers: h, body: body || undefined, signal: ctl.signal, redirect: 'follow' })
+    .then(r => r.ok ? r.text().then(t => pending.set(id, 'OK ' + t)) : pending.set(id, 'ERR HTTP ' + r.status))
+    .catch(e => pending.set(id, 'ERR ' + (e.name === 'AbortError' ? 'timeout' : (e.message || e))))
+    .finally(() => clearTimeout(timer));
+  return id;
+};
+window.auriFetchPoll = id => {
+  const r = pending.get(id);
+  if (r) pending.delete(id);
+  return r === undefined ? 'ERR perso' : r;
+};
+
 let wasLit = null;
 function draw(now) {
   const dt = now - lastFrame; lastFrame = now;
@@ -347,7 +370,35 @@ requestAnimationFrame(draw);
 
 let mp, ready = false;
 const py = code => { try { mp.runPython(code); } catch (e) { $('err').textContent = String(e.message || e); } };
-const press = k => ready && py(`hal.press('${k}')`);
+// Prima che MicroPython sia pronto: premere accensione fa partire lo snake di caricamento sul display
+// e il telefono si accende da solo appena e' pronto (prima il tocco andava perso).
+let wantOn = false, loadAnim = 0;
+function loadSnake() {
+  const W = 84, buf = new Uint8Array(504), px = (x, y) => { if (x >= 0 && x < 84 && y >= 0 && y < 48) buf[(y >> 3) * W + x] |= 1 << (y & 7); };
+  const per = [], x0 = 22, y0 = 16, w = 40, h = 14;
+  for (let x = 0; x < w; x += 3) per.push([x0 + x, y0]);
+  for (let y = 0; y < h; y += 3) per.push([x0 + w, y0 + y]);
+  for (let x = w; x > 0; x -= 3) per.push([x0 + x, y0 + h]);
+  for (let y = h; y > 0; y -= 3) per.push([x0, y0 + y]);
+  const n = per.length, head = Math.floor(performance.now() / 70) % n;
+  for (let i = 0; i < 7; i++) {
+    const [x, y] = per[(head - i + n) % n], s = i ? 2 : 4, o = i ? 0 : -1;
+    for (let a = 0; a < s; a++) for (let b = 0; b < s; b++) px(x + o + a, y + o + b);
+  }
+  const [ax, ay] = per[(head + (n >> 1)) % n];
+  px(ax, ay); px(ax + 1, ay + 1); px(ax - 1, ay + 1); px(ax, ay + 2);
+  window.auriShow([...buf].map(b => b.toString(16).padStart(2, '0')).join(''));
+  window.auriLight?.(-1);
+}
+const press = k => {
+  if (ready) return py(`hal.press('${k}')`);
+  if (k === 'power' && !wantOn) {
+    wantOn = true;
+    document.body.classList.remove('off');
+    $('status').textContent = 'Accensione... (carico AurI OS)';
+    loadAnim = setInterval(loadSnake, 60);
+  }
+};
 const release = k => ready && py(`hal.release('${k}')`);
 window.auriPress = press;
 window.auriRelease = release;
@@ -426,6 +477,7 @@ s.shut()
 `);
     ready = true;
     $('status').textContent = 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
+    if (wantOn) { clearInterval(loadAnim); py('s.power_on()'); }
     py('import js');
     // stato nel pannello: spento o acceso, aggiornato ogni mezzo secondo
     setInterval(() => {

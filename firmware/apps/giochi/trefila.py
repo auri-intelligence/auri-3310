@@ -5,7 +5,7 @@ from apps.giochi.base import Game, PHONE_BIG, sin
 CS = 9
 COLS, ROWS = 7, 4
 Y0 = 11
-TIME = 1200      # steps of 50 ms: one minute
+TIME = 900       # steps of 50 ms: 45 seconds
 GEMS = (
     ('...#...', '..#.#..', '.#.#.#.', '#.#.#.#', '...#...', '...#...', '..###..'),   # antenna
     ('#######', '##...##', '#.#.#.#', '#..#..#', '#.....#', '#.....#', '#######'),   # envelope
@@ -130,7 +130,7 @@ class TreFila(Game):
         i = min(m)
         self.add(pts, (i % COLS) * CS + 4, Y0 + (i // COLS) * CS)
         if n >= 4:
-            self.time = min(TIME, self.time + 60)
+            self.time = min(TIME, self.time + 35)
         self.clear = [m, 5]
         self.beep(1200 + 200 * min(self.combo, 6), 25)
         for c in m:

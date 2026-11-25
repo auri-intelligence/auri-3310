@@ -68,8 +68,8 @@ class Menu(App):
             self.sel = (self.sel + 1) % n
         elif k == keys.NAVI:
             self.items[self.sel][1]()
-        elif k in keys.DIGITS and k != '0' and int(k) <= n:
-            self.sel = int(k) - 1
+        elif k in keys.DIGITS and (int(k) or 10) <= n:
+            self.sel = (int(k) or 10) - 1          # 0 = la decima voce, come sulla tastiera
             self.items[self.sel][1]()
         else:
             super().on_key(k)
@@ -234,3 +234,34 @@ class Confirm(App):
         x = W - len(no) * 6 - 5
         g.panel(x, H - 9, len(no) * 6 + 4, 9)
         g.text(no, x + 2, H - 8)
+
+
+def snake_load(g, now, cy=24, label=None):
+    """Caricamento in stile 3310: uno snake a blocchi che gira intorno a un riquadro e cerca la mela.
+    Non blocca niente: basta ridisegnarlo a ogni giro (tick che ritorna True)."""
+    x0, y0, w, h = 22, cy - 8, 40, 14          # percorso (perimetro del riquadro), passo di 3 px
+    per = []
+    for x in range(0, w, 3):
+        per.append((x0 + x, y0))
+    for y in range(0, h, 3):
+        per.append((x0 + w, y0 + y))
+    for x in range(w, 0, -3):
+        per.append((x0 + x, y0 + h))
+    for y in range(h, 0, -3):
+        per.append((x0, y0 + y))
+    n = len(per)
+    head = (now // 70) % n
+    for i in range(7):                      # 7 blocchi, la testa e' piena e un po' piu' grande
+        x, y = per[(head - i) % n]
+        if i == 0:
+            g.fill_rect(x - 1, y - 1, 4, 4)
+            g.pixel(x + 1, y, 0)            # occhio
+        else:
+            g.fill_rect(x, y, 2, 2)
+    ax, ay = per[(head + n // 2) % n]       # la mela, sempre davanti
+    g.pixel(ax, ay)
+    g.pixel(ax + 1, ay + 1)
+    g.pixel(ax - 1, ay + 1)
+    g.pixel(ax, ay + 2)
+    if label:
+        g.text_center(label, cy + 10)
