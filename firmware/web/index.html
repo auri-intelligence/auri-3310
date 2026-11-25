@@ -364,6 +364,7 @@ function draw(now) {
     ctx.fillRect((i % W) * kx, ((i / W) | 0) * ky, dw, dh);
   }
   dirty = moving;
+  if (window.auriPerf) window.auriPerf.draw = window.auriPerf.draw * 0.9 + (performance.now() - now) * 0.1;
   requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
@@ -484,10 +485,20 @@ s.shut()
       try { mp.runPython('js.window.auriOn = not s.off'); } catch {}
       // nome dell'app in cima alla pila: serve alle prove automatiche (e a capire dove siamo)
       try { mp.runPython('js.window.auriTop = type(s.top).__name__'); document.body.dataset.app = window.auriTop; } catch {}
+      if (window.auriPerf && location.hash.includes('misura') && window.auriOn)
+        fetch('/__misura?app=' + window.auriTop + '&step=' + window.auriPerf.step.toFixed(2) + '&max=' + window.auriPerf.max.toFixed(1) + '&draw=' + window.auriPerf.draw.toFixed(2)).catch(() => {});
+      if (window.auriPerf) document.body.dataset.perf = ['step', window.auriPerf.step.toFixed(2), 'max', window.auriPerf.max.toFixed(1), 'draw', window.auriPerf.draw.toFixed(2)].join(' ');
       document.body.classList.toggle('off', !window.auriOn);
       $('status').textContent = window.auriOn ? 'AurI OS in esecuzione (MicroPython WebAssembly 1.29)' : 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
     }, 500);
-    setInterval(() => py('s.step()'), 20);
+    // contatore delle prestazioni: window.auriPerf = {step: ms medi di s.step(), max, draw: ms del canvas}
+    const perf = window.auriPerf = { step: 0, max: 0, draw: 0, n: 0 };
+    setInterval(() => {
+      const t0 = performance.now();
+      py('s.step()');
+      const dt = performance.now() - t0;
+      perf.step = perf.step * 0.95 + dt * 0.05; perf.max = Math.max(perf.max * 0.999, dt); perf.n++;
+    }, 20);
     autoKeys();
   } catch (e) {
     $('status').textContent = 'Errore di avvio';

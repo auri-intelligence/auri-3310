@@ -89,8 +89,14 @@
   }
 
   // --- accensione del cervello -------------------------------------------
-  async function start(key) {
-    if (st.phase === 'load') return;
+  let loading = null;            // promessa del caricamento in corso
+  function start(key) {
+    if (st.phase === 'load' && loading) return loading;
+    loading = startNow(key).finally(() => { loading = null; });
+    return loading;
+  }
+
+  async function startNow(key) {
     if (key && MODELS[key]) { st.key = key; store.set('auri.cervello.modello', key); }
     const gpu = await checkGpu();
     if (!gpu.ok) {
@@ -151,14 +157,40 @@
     return '';
   }
 
-  async function ask(messages, opts) {
+  // Errori della GPU dei telefoni (buffer, device perso, modello scaricato): si ricarica e si riprova.
+  const GPU_ERR = /not loaded|unmapped|mapping|device (was )?lost|GPUBuffer|out of memory|DXGI|destroyed/i;
+  let chain = Promise.resolve();
+  function ask(messages, opts) {
     const mine = ++gen;
+    stop = true;                                     // ferma la risposta precedente, se c'e'
+    if (engine) { try { engine.interruptGenerate(); } catch (e) {} }
+    st.text = ''; st.done = false; st.error = ''; st.phase = 'gen';
+    if (ui) ui();
+    // in fila: il motore di WebLLM non sopporta due generazioni insieme (da qui l'errore "unmapped")
+    chain = chain.then(() => askNow(messages, opts, mine, 0)).catch(() => {});
+    return chain;
+  }
+
+  function friendly(msg) {
+    return GPU_ERR.test(msg) ? 'gpu' : /network|fetch|Failed to fetch|cache/i.test(msg) ? 'rete' : 'altro';
+  }
+
+  async function askNow(messages, opts, mine, tentativo) {
+    if (mine !== gen) return;
+    if (loading) { try { await loading; } catch (e) {} }
+    if (!engine || st.phase === 'err' || st.phase === 'off') {
+      await start(st.key);
+      if (!engine || st.phase === 'err') {
+        st.error = friendly(st.error || '');
+        st.done = true;
+        if (ui) ui();
+        return;
+      }
+    }
     stop = false;
-    st.text = '';
-    st.done = false;
-    st.error = '';
     st.phase = 'gen';
     st.tps = 0;
+    st.first = 0;            // ms prima del primo pezzo: serve all'app per intrattenere mentre aspetta
     if (ui) ui();
     const t0 = performance.now();
     let n = 0;
@@ -206,7 +238,18 @@
       st.tps = n && ms > 0 ? Math.round(n * 1000 / ms * 10) / 10 : 0;
       track('cervello/risposta');
     } catch (e) {
-      if (mine === gen) st.error = String((e && e.message) || e).slice(0, 200);
+      const msg = String((e && e.message) || e);
+      console.warn('AurI cervello:', msg);
+      if (mine === gen && GPU_ERR.test(msg) && tentativo === 0 && !st.text) {
+        // la GPU del telefono si e' inceppata: si ricarica il modello (dalla cache, pochi secondi)
+        track('cervello/ripresa_gpu');
+        try { await engine.unload(); } catch (e2) {}
+        engine = null;
+        if (worker) { try { worker.terminate(); } catch (e3) {} worker = null; }
+        st.phase = 'off';
+        return askNow(messages, opts, mine, 1);
+      }
+      if (mine === gen) { st.error = friendly(msg); track('cervello/errore_' + st.error); }
     }
     if (mine !== gen) return;
     st.done = true;

@@ -390,6 +390,33 @@ def test_impostazioni():
     print('ok  Impostazioni > Cervello')
 
 
+def test_attesa_lunga():
+    """Modello lento: lo snake gira, le frasi cambiano, AurI parla ogni tanto; errore GPU in italiano."""
+    hal, s = mk()
+    premi(hal, s, keys.NAVI)
+    premi(hal, s, keys.NAVI)
+    premi(hal, s, keys.NAVI)                       # accendi
+    avanza(hal, s, 25 * PASSI_CARICAMENTO + 200)
+    lento = hal.ai_poll
+    hal.ai_poll = lambda: {'text': '', 'done': 0, 'error': ''}   # non risponde
+    app = s.top
+    app._send('perche il cielo e blu')
+    hal.detto.clear()
+    avanza(hal, s, 3000)
+    shot(hal, s, '13_attesa_3s')
+    avanza(hal, s, 12000)
+    shot(hal, s, '14_attesa_15s')
+    assert 1 <= len(hal.detto) <= 3, hal.detto      # parla, ma non troppo
+    avanza(hal, s, 30000)
+    assert len(hal.detto) == 3, hal.detto
+    hal.ai_poll = lambda: {'text': '', 'done': 1, 'error': 'gpu'}
+    avanza(hal, s, 200)
+    assert 'grafica' in ' '.join(app.lines), app.lines
+    shot(hal, s, '15_errore_gpu')
+    hal.ai_poll = lento
+    print('ok  attesa lunga: snake, frasi che girano, voce ogni tanto, errore GPU in italiano')
+
+
 if __name__ == '__main__':
     test_pulizia()
     test_niente_cervello()
@@ -401,4 +428,5 @@ if __name__ == '__main__':
     test_bridge_spento_chiede_di_accendere()
     test_microfono_negato()
     test_impostazioni()
+    test_attesa_lunga()
     print('\ntutti i test passati. Immagini in', OUT)

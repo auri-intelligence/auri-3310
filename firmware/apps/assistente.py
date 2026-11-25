@@ -69,6 +69,8 @@ class Assistente(App):
             pass
         self.brain.chiedi(testo)
         self.state = 'think'
+        self.t_think = self.sys.hal.ticks_ms()
+        self.detti = 0
 
     def _show(self):
         txt = self.brain.text or self.brain.error or t('no_answer')
@@ -210,6 +212,14 @@ class Assistente(App):
                 self.state = 'off'
                 return True
             nuovo = self.brain.poll()
+            if not self.brain.text and not self.brain.done:
+                # attesa lunga: una frase a voce dopo 5 s, poi ogni 8 s (massimo 3)
+                el = now - getattr(self, 't_think', now)
+                if self.detti < 3 and el > 5000 + self.detti * 8000:
+                    from auri.cervello import attesa
+                    self.brain.leggi(attesa(self.detti * 3 + 1)[1])
+                    self.detti += 1
+                return True       # lo snake gira: si ridisegna sempre
             if self.brain.text != self._last:
                 self._last = self.brain.text
                 self.lines = wrap(self.brain.text)
@@ -353,11 +363,15 @@ class Assistente(App):
                 if self.blink:
                     g.fill_rect(W - 4, 11 + min(2, len(self.lines) - 1 - self.pos) * 9 + 6, 3, 2)
             else:
-                g.text_center(t('thinking'), 22)
+                from auri.cervello import attesa
+                from auri.ui import snake_load
                 now = self.sys.hal.ticks_ms()
-                for i in range(3):
-                    if (now // 250) % 3 >= i:
-                        g.fill_rect(36 + i * 6, 34, 3, 3)
+                el = now - getattr(self, 't_think', now)
+                snake_load(g, now, 21)
+                g.fill_rect(0, 30, W, 9, 0)
+                g.text_center(t('thinking') if el < 2500 else attesa(el // 2500 - 1)[0], 31)
+                if el > 3000:
+                    g.text(str(el // 1000) + 's', 0, 11)
             softkey(g, 'C = ' + t('stop'))
             return
         if self.state == 'type':

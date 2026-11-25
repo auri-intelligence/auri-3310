@@ -75,6 +75,37 @@ def riempitivo():
     return RIEMPITIVO.get(i18n.lang, RIEMPITIVO['it'])
 
 
+# Se il modello ci mette tanto, AurI tiene compagnia: frasi che girano sul display (corte, 14 colonne)
+# e ogni tanto una detta a voce. Prima c'era solo "Sto pensando" con un puntino: sembrava bloccato.
+ATTESA = {
+    'it': (('Ci penso...', 'Ci sto pensando, un attimo.'),
+           ('Cerco parole', 'Sto cercando le parole giuste.'),
+           ('Quasi...', 'Ci sono quasi.'),
+           ('Tutto qui!', 'Ho un cervello tutto mio, gira qui dentro.'),
+           ('Niente server', 'Nessun server: penso solo con questo telefono.'),
+           ('Del 2000!', 'Non male per un telefono del duemila.'),
+           ('Metto ordine', 'Metto in ordine i pensieri.'),
+           ('Ancora poco', 'Ancora un momento.')),
+    'en': (('Thinking...', 'Thinking, one moment.'),
+           ('Finding words', 'Looking for the right words.'),
+           ('Almost...', 'Almost there.'),
+           ('All in here!', 'My brain runs right here, inside this phone.'),
+           ('No servers', 'No servers: I think with this phone only.'),
+           ('From 2000!', 'Not bad for a phone from the year two thousand.'),
+           ('Nearly done', 'Just a moment more.')),
+}
+
+
+def attesa(i):
+    """(testo per il display, frase da dire) numero i, a giro."""
+    lista = ATTESA.get(i18n.lang, ATTESA['en' if i18n.lang != 'it' else 'it'])
+    return lista[i % len(lista)]
+
+
+# Gli errori del cervello del browser arrivano come codice: qui diventano parole che si capiscono.
+ERRORI = {'gpu': 'ai_err_gpu', 'rete': 'ai_err_net', 'altro': 'ai_err_other'}
+
+
 def persona():
     return PERSONA.get(i18n.lang, PERSONA['it'])
 
@@ -262,7 +293,9 @@ class Cervello:
         nuovo = testo != self.text or bool(r.get('done')) != self.done
         self.text = testo
         if r.get('error'):
-            self.error = r['error']
+            from auri.i18n import t
+            e = r['error']
+            self.error = t(ERRORI[e]) if e in ERRORI else e
         if r.get('done'):
             self._chiudi()
         return nuovo
