@@ -301,7 +301,7 @@ window.auriRequest = (method, url, body, token) => {
   try {
     const x = new XMLHttpRequest();
     x.open(method, url, false);
-    x.setRequestHeader('Content-Type', 'application/json');
+    if (body) x.setRequestHeader('Content-Type', 'application/json');
     if (token) x.setRequestHeader('Authorization', 'Bearer ' + token);
     x.send(body || null);
     if (x.status < 200 || x.status >= 300) return 'ERR HTTP ' + x.status;
@@ -408,6 +408,10 @@ addEventListener('keyup', e => {
     // la rete di chi visita, e le funzioni che ne hanno bisogno spiegano perche' non ci sono.
     const LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);
     if (!LOCAL) { const c2 = JSON.parse(cfg); c2.bridge_url = ''; c2.token = ''; c2.online = true; cfg = JSON.stringify(c2); }
+    // world leaderboard address, a plain text file in the repo
+    const sc = await fetch('classifica.txt', { cache: 'no-store' }).catch(() => null);
+    const su = sc && sc.ok ? (await sc.text()).trim() : '';
+    if (su.startsWith('https://')) { const c3 = JSON.parse(cfg); c3.scores_url = su; cfg = JSON.stringify(c3); }
     mp.FS.writeFile('/config.json', cfg);
     py(`
 import sys, json

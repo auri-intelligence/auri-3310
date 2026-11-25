@@ -172,6 +172,9 @@ class Game(App):
             if now - self.t0 > 1000:
                 self.state = 'over'
                 self.t0 = now
+                if self.score > 0 and self.sys.config.get('scores_url'):
+                    from apps.giochi.classifica import Classifica
+                    self.sys.push(Classifica(self.sys, self.key, self.score))
             return True
         if self.state == 'over':
             return True

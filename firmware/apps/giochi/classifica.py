@@ -47,6 +47,11 @@ def player_name(sys):
     return sys.hal.load('g_nome', {}).get('nome', '')
 
 
+def quote(s):
+    return ''.join(c if c.isalpha() and ord(c) < 128 or c in '0123456789-_.' else '%%%02X' % b
+                   for c in s for b in c.encode())
+
+
 class NomeInput(App):
     def __init__(self, sys, done):
         super().__init__(sys)
@@ -100,6 +105,7 @@ class Classifica(App):
         self.score = score
         self.url = sys.config.get('scores_url', '')
         self.rows = sys.hal.load('g_' + game, {}).get('top', [])
+        self.me = player_name(sys)
         self.world = False
         self.msg = '' if self.url else t('g_world_soon')
         self.pos = 0
@@ -111,12 +117,12 @@ class Classifica(App):
         hal, body = self.sys.hal, None
         try:
             name = player_name(self.sys)
+            # GET only: a simple request needs no CORS preflight, which Apps Script cannot answer
+            q = 'gioco=' + self.game
             if self.todo == 'send' and valid(name):
-                body = {'gioco': self.game, 'nome': name, 'punti': self.score,
-                        'firma': sign(self.game, name, self.score, self.sys.config.get('scores_key', ''))}
-                r = hal.request('POST', self.url, body)
-            else:
-                r = hal.request('GET', self.url + ('&' if '?' in self.url else '?') + 'gioco=' + self.game)
+                q += '&nome=%s&punti=%d&firma=%s' % (quote(name), self.score,
+                                                    sign(self.game, name, self.score, self.sys.config.get('scores_key', '')))
+            r = hal.request('GET', self.url + ('&' if '?' in self.url else '?') + q)
             top = (r or {}).get('top') if isinstance(r, dict) else None
             if top:
                 self.rows = [[int(e[1]), str(e[0])[:10]] for e in top[:10]]
@@ -156,7 +162,7 @@ class Classifica(App):
         if self.msg:
             lines += wrap(self.msg)
         for i, line in enumerate(lines[self.pos:self.pos + 3]):
-            mine = self.pos + i < len(self.rows) and self.rows[self.pos + i][0] == self.score and self.score
+            mine = self.pos + i < len(self.rows) and self.rows[self.pos + i][1] == self.me[:10]
             if mine:
                 g.round_fill(0, 10 + i * 9, W, 9)
             g.text(line[:14], 1, 11 + i * 9, 0 if mine else 1)

@@ -15,6 +15,10 @@ def _opener(sys, mod, cls):
         # imported on demand: on the ESP32 only the chosen game stays in RAM
         m = __import__('apps.giochi.' + mod, None, None, (cls,))
         sys.push(getattr(m, cls)(sys))
+        # name first: every game counts for the world leaderboard
+        from apps.giochi.classifica import NomeInput, valid, player_name
+        if not valid(player_name(sys)):
+            sys.push(NomeInput(sys, lambda n: None))
     return go
 
 

@@ -206,6 +206,12 @@ def test_menu_and_snake():
         assert s.top is gm
         gm.sel = i
         key(hal, s, keys.NAVI)
+        if i == 0:
+            assert type(s.top).__name__ == 'NomeInput'
+            for k in '5444':
+                key(hal, s, k)
+                run(hal, s, 1200)
+            key(hal, s, keys.NAVI)
         assert type(s.top).__name__ == GAMES[i][1]
         key(hal, s, keys.C)
 
@@ -222,9 +228,8 @@ def test_online():
     g.score = 42
     g.lose()
     run(hal, s, 1100)
-    key(hal, s, '8')
     run(hal, s, 60)
-    assert type(s.top).__name__ == 'NomeInput'
+    assert type(s.top).__name__ == 'NomeInput'   # the world leaderboard opens by itself
     for k in '2' * 1:
         key(hal, s, k)
     key(hal, s, keys.NAVI)          # too short
@@ -241,7 +246,8 @@ def test_online():
     run(hal, s, 200)
     assert type(s.top).__name__ == 'Classifica' and s.top.world, s.top.msg
     m, u, b = hal.sent[0]
-    assert m == 'POST' and b['nome'] == 'LUIGI' and b['punti'] == 42 and b['firma'] == cl.sign('volo', 'LUIGI', 42, 'k')
+    assert m == 'GET' and u == 'https://example.invalid/score?gioco=volo&nome=LUIGI&punti=42&firma=' + cl.sign('volo', 'LUIGI', 42, 'k'), u
+    assert cl.quote('Lu gi') == 'Lu%20gi'
     shot(hal, '6_mondo.png')
 
 
