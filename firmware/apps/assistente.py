@@ -8,7 +8,7 @@ Il cervello lo scegli in auri/cervello.py: il modello dentro il dispositivo (bro
 oppure quello del bridge di casa. Qui si disegna soltanto.
 """
 from auri import keys
-from auri.ui import App, Menu, softkey
+from auri.ui import App, Menu, softkey, stato
 from auri.gfx import W, H, wrap
 from auri.cervello import Cervello, LOCALE, BRIDGE
 from auri.t9 import MultiTap
@@ -344,9 +344,11 @@ class Assistente(App):
 
     # --- disegno ---------------------------------------------------------------
     def _head(self, g):
-        g.logo(0, 0)
+        # barra di stato sempre visibile; al centro il logo e, piccolo, dove pensa AurI (loc/casa)
+        stato(g, self.sys, self.sys.hal.ticks_ms() // 500)
+        g.logo(28, 0)
         tag = 'loc' if self.brain.motore() == LOCALE else 'casa' if self.brain.motore() == BRIDGE else '--'
-        g.text(tag, W - len(tag) * 6, 0)
+        g.text_small(tag, 49, 2)
         for x in range(0, W, 2):
             g.pixel(x, 9)
 

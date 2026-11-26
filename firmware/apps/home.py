@@ -1,5 +1,5 @@
 from auri import keys
-from auri.ui import App, IconMenu, TextView, softkey
+from auri.ui import App, IconMenu, TextView, softkey, stato
 from auri import icons
 from auri.gfx import W, Canvas
 from auri.core import VERSION
@@ -57,27 +57,7 @@ class Home(App):
 
     def draw(self, g):
         hal = self.sys.hal
-        st = self.sys.settings
-        rssi = 0 if st['aereo'] or not st['wifi'] else hal.wifi_level()
-        if st['aereo']:
-            g.icon(('..#..', '..#..', '.###.', '#####', '..#..', '..#..', '.###.'), 2, 1)
-        for i in range(4 if not st['aereo'] else 0):
-            h = 2 + i * 2
-            if i < rssi:
-                g.fill_rect(i * 3, 8 - h, 2, h)
-            else:
-                g.pixel(i * 3, 7)
-        if st['bt'] and not st['aereo']:
-            g.icon(('.#.', '.##', '##.', '.#.', '##.', '.##', '.#.'), 14, 1)
-        if st['gps'] and not st['aereo']:
-            g.icon(('.#.', '#.#', '#.#', '.#.', '.#.'), 19, 2)
-        pct, chg = self.sys.battery
-        g.rect(W - 13, 1, 11, 7)
-        g.vline(W - 2, 3, 3)
-        fill = pct * 9 // 100
-        if chg and pct < 100:
-            fill = max(fill, (getattr(self, '_f', 0) % 4) * 3)
-        g.fill_rect(W - 12, 2, fill, 5)
+        stato(g, self.sys, getattr(self, '_f', 0))
         g.logo_center(0)
         tm = hal.localtime()
         h = tm[3] if self.sys.settings['clock24'] else (tm[3] % 12 or 12)

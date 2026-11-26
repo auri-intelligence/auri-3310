@@ -270,3 +270,50 @@ def snake_load(g, now, cy=24, label=None):
 def onoff(v):
     """'si'/'no' tradotto: usato da tutti i menu di impostazioni."""
     return t('on') if v else t('off')
+
+
+# Wi-Fi a ventaglio: punto + 3 archi (dal piccolo al grande). Archi accesi = segnale, spenti = tratteggiati.
+_WIFI = ((('....#....',), 0),
+         (('...###...', '..#...#..'), 4),
+         (('..#####..', '.#.....#.'), 2),
+         (('.#######.', '#.......#'), 0))
+
+
+def _wifi(g, livello):
+    # livello 0..4 (4 = pieno), -1 = Wi-Fi spento (solo una crocetta piccola)
+    if livello < 0:
+        g.icon(('#.#', '.#.', '#.#'), 3, 3)
+        return
+    for k, (righe, y) in enumerate(_WIFI):
+        if k == 0:
+            g.icon(righe, 0, 6)
+        elif k < livello:
+            g.icon(righe, 0, y)
+        else:
+            for dy, r in enumerate(righe):
+                for x, ch in enumerate(r):
+                    if ch == '#' and x % 2 == 0:
+                        g.pixel(x, y + dy)
+
+
+def stato(g, sys, f=0):
+    """Barra di stato in alto (rete, Bluetooth, posizione, batteria): uguale in Home e nell'assistente,
+    cosi' le icone non spariscono mai. f = fotogramma per l'animazione della carica."""
+    hal = sys.hal
+    st = sys.settings
+    rssi = 0 if st['aereo'] or not st['wifi'] else hal.wifi_level()
+    if st['aereo']:
+        g.icon(('..#..', '..#..', '.###.', '#####', '..#..', '..#..', '.###.'), 2, 1)
+    if not st['aereo']:
+        _wifi(g, rssi if st['wifi'] else -1)
+    if st['bt'] and not st['aereo']:
+        g.icon(('.#.', '.##', '##.', '.#.', '##.', '.##', '.#.'), 14, 1)
+    if st['gps'] and not st['aereo']:
+        g.icon(('.#.', '#.#', '#.#', '.#.', '.#.'), 19, 2)
+    pct, chg = sys.battery
+    g.rect(W - 13, 1, 11, 7)
+    g.vline(W - 2, 3, 3)
+    fill = pct * 9 // 100
+    if chg and pct < 100:
+        fill = max(fill, (f % 4) * 3)
+    g.fill_rect(W - 12, 2, fill, 5)
