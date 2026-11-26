@@ -480,6 +480,7 @@ renderer.setAnimationLoop(() => {
 // ---------- prove guasti: stacca un filo o collegalo al pin sbagliato ----------
 // Livelli: 0 = funziona, 1 = funziona a meta, 2 = non parte / schermo morto, 3 = rischio di danni.
 const LIV = ['✅ funziona', '⚠️ funziona a metà', '❌ non parte', '🔥 rischio danni'];
+const TASTO_FW = k => ({ '▲': 'up', '▼': 'down', C: 'c', Navi: 'navi' }[k] || k);   // nomi dei tasti nel firmware
 const KEYMAP = [['1', '2', '3', '▲'], ['4', '5', '6', '▼'], ['7', '8', '9', 'C'], ['*', '0', '#', 'Navi']];
 // a cosa serve ogni GPIO secondo board.py (sul banco senza batteria: 3 e 21 restano liberi)
 const FUNZ = { 8: 'LCD_RES', 10: 'LCD_SCE', 9: 'LCD_DC', 11: 'LCD_SDIN', 12: 'LCD_SCLK', 7: 'BACKLIGHT', 15: 'KEY_ROWS[0]', 16: 'KEY_ROWS[1]', 17: 'KEY_ROWS[2]', 18: 'KEY_ROWS[3]', 4: 'KEY_COLS[0]', 5: 'KEY_COLS[1]', 13: 'KEY_COLS[2]', 14: 'KEY_COLS[3]', 6: 'VIBRA', 47: 'SPEAKER', 0: 'POWER_KEY', 41: 'SD_CS', 38: 'SD_MOSI', 39: 'SD_SCK', 40: 'SD_MISO' };
@@ -507,8 +508,8 @@ function effetto(c) {
     SCLK: { l: 2, t: 'Niente clock: il display non riceve niente e resta vuoto.', tel: 'vuoto' } }[m[1]];
   if (/BACKLIGHT/.test(n)) return { l: 1, t: 'Niente retroilluminazione: lo schermo funziona ma al buio non si legge.', tel: 'buio' };
   if (/^Display (VCC|GND)/.test(t)) return { l: 2, t: 'Display senza alimentazione: spento, il resto del telefono va.', tel: 'spento' };
-  if ((m = n.match(/KEY_ROWS\[(\d)\]/))) return { l: 1, t: `Riga ${+m[1] + 1} staccata: non rispondono i tasti ${tasti(+m[1], true)}.`, nota: `tasti ${tasti(+m[1], true)} non rispondono` };
-  if ((m = n.match(/KEY_COLS\[(\d)\]/))) return { l: 1, t: `Colonna ${+m[1] + 1} staccata: non rispondono i tasti ${tasti(+m[1], false)}.`, nota: `tasti ${tasti(+m[1], false)} non rispondono` };
+  if ((m = n.match(/KEY_ROWS\[(\d)\]/))) return { l: 1, t: `Riga ${+m[1] + 1} staccata: non rispondono i tasti ${tasti(+m[1], true)}.`, nota: `tasti ${tasti(+m[1], true)} non rispondono`, morti: KEYMAP[+m[1]].map(TASTO_FW) };
+  if ((m = n.match(/KEY_COLS\[(\d)\]/))) return { l: 1, t: `Colonna ${+m[1] + 1} staccata: non rispondono i tasti ${tasti(+m[1], false)}.`, nota: `tasti ${tasti(+m[1], false)} non rispondono`, morti: KEYMAP.map(r => TASTO_FW(r[+m[1]])) };
   if (c.comp === 'vibra') return { l: 1, t: 'Niente vibrazione: il motorino non riceve corrente dal transistor.', nota: 'niente vibrazione' };
   if (c.comp === 'piezo') return { l: 1, t: 'Niente bip: i toni non arrivano al cicalino.', nota: 'muto (niente bip)' };
   if (c.comp === 'power') return { l: 1, t: 'Il tasto Power non fa niente: non si spegne e, una volta spento, non si riaccende col tasto.', nota: 'tasto Power morto' };
@@ -573,11 +574,8 @@ function guasti() {
 }
 
 // ---------- anteprima del display del telefono ----------
-const telCv = document.getElementById('tel'), telG = telCv.getContext('2d');
-const mini = document.createElement('canvas'); mini.width = 84; mini.height = 48;
-const mg = mini.getContext('2d', { willReadFrequently: true });
 function statoTel() {
-  const gs = guasti(), s = { lv: 0, schermo: 'ok', toast: '', note: [], fuoco: false };
+  const gs = guasti(), s = { lv: 0, schermo: 'ok', toast: '', note: [], fuoco: false, morti: [] };
   const pr = { spento: 4, vuoto: 3, caos: 3, buio: 1 };
   for (const { e } of gs) {
     s.lv = Math.max(s.lv, e.l);
@@ -585,41 +583,25 @@ function statoTel() {
     if (e.toast) s.toast = e.toast;
     if (e.nota && !s.note.includes(e.nota)) s.note.push(e.nota);
     if (e.fuoco) s.fuoco = true;
+    if (e.morti) for (const k of e.morti) if (!s.morti.includes(k)) s.morti.push(k);
   }
   return { ...s, gs };
 }
-function disegnaHome(toast) {
-  mg.fillStyle = '#fff'; mg.fillRect(0, 0, 84, 48);
-  mg.fillStyle = '#000'; mg.font = '8px monospace'; mg.textBaseline = 'top';
-  for (let i = 0; i < 4; i++) mg.fillRect(i * 3, 7 - i * 2, 2, 2 + i * 2);       // segnale
-  mg.strokeStyle = '#000'; mg.lineWidth = 1; mg.strokeRect(71.5, 1.5, 10, 6); mg.fillRect(73, 3, 7, 3); mg.fillRect(82, 3, 1, 3);  // batteria (a rete)
-  mg.font = 'bold 9px monospace'; mg.fillText('AurI', 31, 0);
-  const d = new Date(), hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
-  mg.font = 'bold 17px monospace'; mg.fillText(hh + (d.getSeconds() % 2 ? ':' : ' ') + mm, 18, 12);
-  mg.font = 'bold 9px sans-serif'; mg.fillText('Menu', 30, 38);
-  if (toast) { mg.fillStyle = '#fff'; mg.fillRect(4, 13, 76, 20); mg.fillStyle = '#000'; mg.strokeRect(4.5, 13.5, 75, 19); mg.font = '8px monospace'; mg.fillText(toast.slice(0, 13), 8, 19); }
-}
+// il display e' il SIMULATORE VERO di AurI (index.html#incassato) dentro un iframe: stesso telefono, stessi tasti.
+// I guasti del banco gli arrivano come messaggio e agiscono davvero (schermo vuoto, tasti morti, toast...).
+const telFrame = document.getElementById('telframe');
+let ultimoGuasto = '';
 function disegnaTel() {
   const s = statoTel();
-  let sfondo = '#9fb59a', pixel = '#1d2a1b';
-  if (s.schermo === 'spento') { sfondo = '#20251e'; }
-  else if (s.schermo === 'buio') { sfondo = '#4d5a48'; pixel = '#121810'; }
-  telG.imageSmoothingEnabled = false;
-  telG.fillStyle = sfondo; telG.fillRect(0, 0, telCv.width, telCv.height);
-  if (s.schermo !== 'spento') {
-    if (s.schermo === 'vuoto') { mg.fillStyle = '#fff'; mg.fillRect(0, 0, 84, 48); }
-    else if (s.schermo === 'caos') { const im = mg.createImageData(84, 48); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() < 0.35 ? 0 : 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } mg.putImageData(im, 0, 0); }
-    else disegnaHome(s.toast);
-    const im = mg.getImageData(0, 0, 84, 48).data, k = telCv.width / 84;
-    telG.fillStyle = pixel;
-    for (let y = 0; y < 48; y++) for (let x = 0; x < 84; x++) if (im[(y * 84 + x) * 4] < 110) telG.fillRect(x * k, y * k, k - 0.4, k - 0.4);
-  }
+  const msg = JSON.stringify({ schermo: s.schermo, morti: s.morti, toast: s.toast });
+  if (msg !== ultimoGuasto) { ultimoGuasto = msg; try { telFrame.contentWindow.postMessage({ auriGuasto: JSON.parse(msg) }, '*'); } catch (e) {} }
   document.getElementById('telnota').textContent = s.schermo === 'spento' ? 'spento: nessuna immagine' : s.note.join(' · ');
   document.getElementById('telfuoco').style.display = s.fuoco ? 'block' : 'none';
   const st = document.getElementById('stato');
   st.textContent = 'Telefono: ' + LIV[s.lv]; st.className = 'l' + s.lv;
   return s;
 }
+telFrame.addEventListener('load', () => { ultimoGuasto = ''; setTimeout(disegnaTel, 1500); });
 setInterval(disegnaTel, 500);
 
 // ---------- aspetto dei fili guasti ----------

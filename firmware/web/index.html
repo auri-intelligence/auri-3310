@@ -85,6 +85,11 @@
   #mutebtn { position: absolute; top: 14px; left: 182px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: rgba(20,24,32,.8); color: var(--fg); font: 600 19px system-ui; cursor: pointer; }
   body.d3 #mutebtn { left: 126px; }
   body.full #mutebtn { display: none; }
+  /* #incassato: il telefono dentro il banco ESP32 in 3D (iframe): solo il telefono, niente pannelli */
+  body.incassato #fsexit, body.incassato #bancobtn, body.incassato #info, body.incassato #powerhint, body.incassato #status { display: none !important; }
+  body.incassato #stage { background: #0f1115; }
+  body.g-spento #lcd { opacity: 0; }
+  body.g-buio #lcd { filter: brightness(.42) saturate(.6); }
   /* banco ESP32 in 3D: sempre in alto a sinistra, accanto agli altri pulsanti */
   #bancobtn { position: absolute; top: 14px; left: 238px; z-index: 2; height: 46px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--accent); background: rgba(20,24,32,.8); color: var(--accent); font: 600 13px system-ui; display: flex; align-items: center; gap: 6px; text-decoration: none; white-space: nowrap; backdrop-filter: blur(6px); }
   body.d3 #bancobtn { left: 182px; }
@@ -448,6 +453,13 @@ function draw(now) {
     if (any) { ctx.fillStyle = q === 8 ? `rgb(${fg})` : `rgba(${fg},${(0.92 * hi).toFixed(2)})`; ctx.fill(); }
   }
   dirty = moving;
+  const gu = window.auriGuasto && window.auriGuasto.schermo;
+  if (gu === 'vuoto') ctx.drawImage(bgCache.c, 0, 0);                      // il display non riceve niente
+  else if (gu === 'caos') {                                               // DC sbagliato: pixel a caso
+    ctx.drawImage(bgCache.c, 0, 0); ctx.beginPath();
+    for (let i = 0; i < W * H; i++) if (Math.random() < 0.33) ctx.rect((i % W) * kx, ((i / W) | 0) * ky, dw, dh);
+    ctx.fillStyle = `rgb(${fg})`; ctx.fill(); dirty = true;
+  }
   if (window.auriPerf) window.auriPerf.draw = window.auriPerf.draw * 0.9 + (performance.now() - now) * 0.1;
   requestAnimationFrame(draw);
 }
@@ -458,6 +470,20 @@ const py = code => { try { mp.runPython(code); } catch (e) { const m = String(e.
 // Prima che MicroPython sia pronto: premere accensione fa partire lo snake di caricamento sul display
 // e il telefono si accende da solo appena e' pronto (prima il tocco andava perso).
 let wantOn = false, loadAnim = 0;
+// #incassato: dentro il banco ESP32 in 3D. Si accende da solo e riceve i guasti del banco (postMessage)
+const INCASSATO = location.hash.includes('incassato');
+if (INCASSATO) {
+  document.body.classList.add('incassato', 'full');
+  addEventListener('message', e => {
+    const g = e.data && e.data.auriGuasto; if (!g) return;
+    const prima = window.auriGuasto || {};
+    window.auriGuasto = g;
+    document.body.classList.toggle('g-spento', g.schermo === 'spento');
+    document.body.classList.toggle('g-buio', g.schermo === 'buio');
+    dirty = true;
+    if (g.toast && g.toast !== prima.toast && ready) { try { py('s.toast(' + JSON.stringify(g.toast) + ', 2500)'); } catch (er) {} }
+  });
+}
 function loadSnake() {
   const W = 84, buf = new Uint8Array(504), px = (x, y) => { if (x >= 0 && x < 84 && y >= 0 && y < 48) buf[(y >> 3) * W + x] |= 1 << (y & 7); };
   const per = [], x0 = 22, y0 = 16, w = 40, h = 14;
@@ -476,6 +502,7 @@ function loadSnake() {
   window.auriLight?.(-1);
 }
 const press = k => {
+  if (window.auriGuasto && (window.auriGuasto.morti || []).includes(k)) return;   // guasto del banco: tasto staccato
   if (ready) return py(`hal.press('${k}')`);
   if (k === 'power' && !wantOn) {
     wantOn = true;
@@ -576,7 +603,7 @@ s.shut()
     ready = true;
     window.auriLog('avvio', 'AurI OS pronto (MicroPython caricato)');
     $('status').textContent = 'Spento: tieni premuto il tasto di accensione (in alto, o P)';
-    if (wantOn) { clearInterval(loadAnim); py('s.power_on()'); }
+    if (wantOn || INCASSATO) { clearInterval(loadAnim); py('s.power_on()'); }
     py('import js');
     // stato nel pannello: spento o acceso, aggiornato ogni mezzo secondo
     setInterval(() => {

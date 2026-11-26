@@ -38,7 +38,10 @@
   .finwarn { display: none; } body.finito .finwarn { display: block; }
   /* anteprima del display del telefono, in alto a sinistra */
   #telbox { position: fixed; top: 56px; left: 12px; z-index: 3; background: #2a2e33; border: 1px solid var(--line); border-radius: 12px; padding: 8px 8px 6px; width: 270px; }
-  #telbox canvas { display: block; width: 252px; height: 144px; border-radius: 4px; image-rendering: pixelated; }
+  #telbox iframe { display: block; width: 210px; height: 492px; border: 0; border-radius: 8px; background: #0f1115; }
+  #telbox.min iframe { height: 0; }
+  #telbox { width: 226px !important; }
+  #telmin { float: right; background: none; border: 1px solid var(--line); color: var(--fg); border-radius: 6px; padding: 0 7px; cursor: pointer; }
   #telbox .t { font-size: 11px; color: var(--muted); margin: 0 0 5px; }
   #telnota { font-size: 11.5px; color: #ffd28a; margin-top: 5px; min-height: 14px; }
   #telfuoco { position: absolute; top: 26px; right: 14px; font-size: 30px; display: none; animation: pulsa .8s infinite alternate; }
@@ -53,7 +56,7 @@
   tr.gu td { color: #ffbe3c; }
   .rad label { display: block; margin: 4px 0; }
   @media (max-width: 760px) {
-    #telbox { width: 182px; padding: 6px; } #telbox canvas { width: 168px; height: 96px; }
+    #telbox { width: 150px !important; padding: 6px; } #telbox iframe { width: 136px; height: 318px; }
     #stato { top: auto; right: auto; left: 12px; bottom: calc(52vh + 10px); font-size: 12px; }
     body.closed #stato { bottom: 12px; } body:not(.closed) #stato { right: auto; }
     #viste { top: 56px; left: 12px; } #telbox { top: 100px; }
@@ -69,7 +72,7 @@
 <body>
 <div id="scena"></div>
 <a id="back" href="./">&larr; simulatore</a>
-<div id="telbox"><p class="t">Display del telefono (cosa vedresti)</p><canvas id="tel" width="252" height="144"></canvas><div id="telnota"></div><div id="telfuoco">🔥</div></div>
+<div id="telbox"><p class="t">Il telefono vero (AurI OS acceso): usa i tasti o la tastiera del PC <button id="telmin" title="Riduci">–</button></p><iframe id="telframe" src="index.html#incassato&banco" title="AurI simulatore"></iframe><div id="telnota"></div><div id="telfuoco">🔥</div></div>
 <div id="stato" class="l0">Telefono: ✅ funziona</div>
 <div id="viste"><button data-v="banco" class="on">Banco</button><button data-v="finito">Telefono finito</button><label id="eslab">esplodi <input type="range" id="esplodi" min="0" max="1" step="0.01" value="0.5"></label></div>
 <button id="apri">Collegamenti</button>
@@ -105,5 +108,6 @@
 </aside>
 <div id="hint">Trascina per girare · rotella/pizzico per lo zoom · tasto destro/due dita per spostare</div>
 <script type="module" src="banco3d.js"></script>
+<script>document.getElementById("telmin").onclick=()=>document.getElementById("telbox").classList.toggle("min");</script>
 </body>
 </html>
