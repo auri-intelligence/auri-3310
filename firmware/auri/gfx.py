@@ -5,6 +5,43 @@ H = 48
 
 
 _ZERO = bytes(W * H // 8)
+_PUNTI = {}
+
+
+_P2X = {}
+
+
+def _punti2x(base):
+    p = _P2X.get(base)
+    if p is None:
+        F = font.FONT
+
+        def px(i, j):
+            if 0 <= i < font.W and 0 <= j < font.H:
+                return (F[base + i] >> j) & 1
+            return 0
+        out = []
+        for i in range(font.W):
+            for j in range(font.H):
+                q0 = px(i, j)
+                a, b, d, e = px(i, j - 1), px(i + 1, j), px(i - 1, j), px(i, j + 1)
+                if b != d and a != e:
+                    q = (d if a == d else q0, b if a == b else q0, d if d == e else q0, b if e == b else q0)
+                else:
+                    q = (q0, q0, q0, q0)
+                for k in range(4):
+                    if q[k]:
+                        out.append((i * 2 + (k & 1), j * 2 + (k >> 1)))
+        p = _P2X[base] = tuple(out)
+    return p
+
+
+def _punti(rows):
+    k = rows if isinstance(rows, tuple) else id(rows)
+    p = _PUNTI.get(k)
+    if p is None:
+        p = _PUNTI[k] = tuple((i, j) for j, r in enumerate(rows) for i, ch in enumerate(r) if ch == '#')
+    return p
 
 
 class Canvas:
@@ -70,6 +107,12 @@ class Canvas:
                         self.fill_rect(x + col * s, y + row * s, s, s, c)
 
     def _char2x(self, base, x, y, c):
+        # Scale2x calcolato una volta per carattere (prima a ogni fotogramma: era il peso della Home)
+        pix = self.pixel
+        for i, j in _punti2x(base):
+            pix(x + i, y + j, c)
+
+    def _char2x_calcolo(self, base, x, y, c):
         # Scale2x: doubles the glyph but rounds diagonal steps, so big digits look smooth instead of blocky.
         F = font.FONT
 
@@ -105,11 +148,11 @@ class Canvas:
         self.text(s, (W - text_width(s, scale)) // 2, y, c, scale)
 
     def icon(self, rows, x, y, c=1):
-        # rows: list of strings, '#' = pixel on
-        for j, r in enumerate(rows):
-            for i, ch in enumerate(r):
-                if ch == '#':
-                    self.pixel(x + i, y + j, c)
+        # rows: list of strings, '#' = pixel on. Converted once (list of lit pixels), not re-read per frame.
+        pts = _punti(rows)
+        pix = self.pixel
+        for i, j in pts:
+            pix(x + i, y + j, c)
 
 
     def dither(self, x, y, w, h, level=2):
@@ -142,17 +185,23 @@ class Canvas:
         self.vline(x + w - 1, y + 1, h - 2)
 
     def blit(self, src, y0, y1):
-        # copy rows y0..y1-1 from another canvas (used to clip rolling digits)
-        for y in range(y0, y1):
-            for x in range(W):
-                self.pixel(x, y, src.get(x, y))
+        # copy rows y0..y1-1 from another canvas (used to clip rolling digits): a byte at a time with a
+        # row mask per 8-row bank (prima 1344 chiamate pixel/get a ogni fotogramma della Home)
+        y0, y1 = max(0, y0), min(H, y1)
+        d, s = self.buf, src.buf
+        for bank in range(y0 >> 3, ((y1 - 1) >> 3) + 1):
+            lo = max(y0, bank * 8) - bank * 8
+            hi = min(y1, bank * 8 + 8) - bank * 8
+            m = ((1 << hi) - 1) & ~((1 << lo) - 1) & 0xFF
+            nm = ~m & 0xFF
+            for i in range(bank * W, bank * W + W):
+                d[i] = (d[i] & nm) | (s[i] & m)
 
     def icon2(self, rows, x, y, c=1, s=2):
         # pixel art scaled up, clipped by pixel() at the screen edges (used while sliding)
-        for j, r in enumerate(rows):
-            for i, ch in enumerate(r):
-                if ch == '#':
-                    self.fill_rect(x + i * s, y + j * s, s, s, c)
+        fr = self.fill_rect
+        for i, j in _punti(rows):
+            fr(x + i * s, y + j * s, s, s, c)
 
     def logo(self, x, y, c=1):
         # "AurI": full-size A and I, a smaller "ur" sitting on the same baseline.
@@ -265,8 +314,85 @@ if _fb is not None:
         if c:
             self.fb.blit(g, x, y, 0)
         else:
-            self.fb.blit(g, x, y, 0, _PAL0)
+            self.fb.blit(g, x, y, 1, _PAL0)   # chiave dopo la palette: 1 = sfondo trasparente
 
+    _ICONE = {}
+
+    def _icon(self, rows, x, y, c=1):
+        if c == 2:
+            return _py_icon(self, rows, x, y, c)
+        k = rows if isinstance(rows, tuple) else id(rows)
+        fb = _ICONE.get(k)
+        if fb is None:
+            w = max(len(r) for r in rows) if rows else 0
+            h = len(rows)
+            if not w or not h:
+                return
+            fb = _fb.FrameBuffer(bytearray(((w + 7) // 8) * h), w, h, _fb.MONO_HLSB)
+            for i, j in _punti(rows):
+                fb.pixel(i, j, 1)
+            _ICONE[k] = fb
+        if c:
+            self.fb.blit(fb, x, y, 0)
+        else:
+            self.fb.blit(fb, x, y, 1, _PAL0)   # chiave dopo la palette: 1 = sfondo trasparente
+
+    _GRANDI = {}
+    _py_c2x = Canvas._char2x
+
+    def _char2x_fb(self, base, x, y, c):
+        if c == 2:
+            return _py_c2x(self, base, x, y, c)
+        fb = _GRANDI.get(base)
+        if fb is None:
+            fb = _fb.FrameBuffer(bytearray(2 * 16), 10, 16, _fb.MONO_HLSB)
+            for i, j in _punti2x(base):
+                fb.pixel(i, j, 1)
+            _GRANDI[base] = fb
+        if c:
+            self.fb.blit(fb, x, y, 0)
+        else:
+            self.fb.blit(fb, x, y, 1, _PAL0)   # chiave dopo la palette: 1 = sfondo trasparente
+
+    Canvas._char2x = _char2x_fb
+
+    _GRANDI2 = {}
+    _py_icon2 = Canvas.icon2
+
+    def _icon2(self, rows, x, y, c=1, s=2):
+        if c == 2:
+            return _py_icon2(self, rows, x, y, c, s)
+        k = (rows if isinstance(rows, tuple) else id(rows), s)
+        fb = _GRANDI2.get(k)
+        if fb is None:
+            w = max(len(r) for r in rows) * s
+            h = len(rows) * s
+            fb = _fb.FrameBuffer(bytearray(((w + 7) // 8) * h), w, h, _fb.MONO_HLSB)
+            for i, j in _punti(rows):
+                fb.fill_rect(i * s, j * s, s, s, 1)
+            _GRANDI2[k] = fb
+        if c:
+            self.fb.blit(fb, x, y, 0)
+        else:
+            self.fb.blit(fb, x, y, 1, _PAL0)   # chiave dopo la palette: 1 = sfondo trasparente
+
+    def _blit(self, src, y0, y1):
+        # stesse righe y0..y1-1 copiate dall'altra tela, tutto in C: si pulisce fuori zona nella sorgente
+        # (e' una tela di lavoro) e dentro zona nella destinazione, poi blit con lo 0 trasparente
+        y0, y1 = max(0, y0), min(H, y1)
+        if y1 <= y0:
+            return
+        if y0:
+            src.fb.fill_rect(0, 0, W, y0, 0)
+        if y1 < H:
+            src.fb.fill_rect(0, y1, W, H - y1, 0)
+        self.fb.fill_rect(0, y0, W, y1 - y0, 0)
+        self.fb.blit(src.fb, 0, 0, 0)
+
+    Canvas.icon2 = _icon2
+    Canvas.blit = _blit
+    _py_icon = Canvas.icon
+    Canvas.icon = _icon
     Canvas.__init__ = _init
     Canvas.pixel = _pixel
     Canvas.hline = _hline

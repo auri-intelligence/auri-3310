@@ -86,6 +86,9 @@ class ESP32Hal:
         self.tone_until = 0
         self.bl = machine.PWM(machine.Pin(board.BACKLIGHT), freq=1000, duty_u16=0)
         self.vib = machine.Pin(board.VIBRA, machine.Pin.OUT, value=0)
+        self.vib_until = 0
+        self._req = {}             # richieste di rete in corso in un thread: id -> risultato
+        self._req_n = 0
         self.lit_until = 0
         self.wlan = network.WLAN(network.STA_IF)
         self.i2c = machine.I2C(0, scl=machine.Pin(board.I2C_SCL), sda=machine.Pin(board.I2C_SDA), freq=400000)
@@ -113,6 +116,9 @@ class ESP32Hal:
         if self.tone_until and time.ticks_diff(time.ticks_ms(), self.tone_until) > 0:
             self.spk.duty_u16(0)
             self.tone_until = 0
+        if self.vib_until and time.ticks_diff(time.ticks_ms(), self.vib_until) > 0:
+            self.vib(0)
+            self.vib_until = 0
         ev = self.keys.scan()
         down = not self.pwr()
         if down != self.pwr_down:
@@ -129,9 +135,10 @@ class ESP32Hal:
         self.lit_until = time.ticks_add(time.ticks_ms(), ms) if on and ms >= 0 else 0
 
     def vibrate(self, ms):
+        # non bloccante come il bip: events() spegne il motorino quando e' ora (prima sleep_ms fermava
+        # tutto il telefono fino a 300 ms, a fine partita il gioco si congelava)
         self.vib(1)
-        time.sleep_ms(ms)
-        self.vib(0)
+        self.vib_until = time.ticks_add(time.ticks_ms(), ms)
 
     def beep(self, freq, ms, vol=3):
         # non-blocking: events() switches the tone off when its time is up
@@ -217,6 +224,9 @@ class ESP32Hal:
         """Monta la microSD su /sd. Ci stanno i pesi del cervello e, volendo, tutto AurI OS."""
         if self.sd:
             return True
+        # senza scheda non si riprova a ogni chiamata: l'inizializzazione della SD costa tempo
+        if getattr(self, '_sd_fallita', None) is not None and time.ticks_diff(time.ticks_ms(), self._sd_fallita) < 30000:
+            return False
         try:
             import os
             sd = machine.SDCard(slot=2, sck=machine.Pin(board.SD_SCK), mosi=machine.Pin(board.SD_MOSI),
@@ -225,6 +235,7 @@ class ESP32Hal:
             self.sd = True
         except Exception as e:
             print('microSD:', e)
+            self._sd_fallita = time.ticks_ms()
         return self.sd
 
     def _llm_files(self):
@@ -401,6 +412,31 @@ class ESP32Hal:
             return r.json()
         finally:
             r.close()
+
+    # Richieste che non bloccano (classifica, ecc.): partono in un thread, il ciclo principale continua a
+    # disegnare e a leggere i tasti. auri/net.py le usa da sole quando la HAL le ha.
+    def request_start(self, method, url, body=None, token=None):
+        import _thread
+        self._req_n += 1
+        rid = self._req_n
+        self._req[rid] = None
+
+        def lavora():
+            try:
+                self._req[rid] = (self.request(method, url, body, token), '')
+            except Exception as e:
+                self._req[rid] = (None, str(e) or 'rete')
+        try:
+            _thread.start_new_thread(lavora, ())
+        except Exception:
+            lavora()              # niente thread: almeno funziona (bloccando)
+        return rid
+
+    def request_poll(self, rid):
+        r = self._req.get(rid)
+        if r is not None:
+            del self._req[rid]
+        return r
 
     def load(self, name, default):
         try:

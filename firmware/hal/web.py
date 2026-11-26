@@ -46,7 +46,10 @@ class WebHal:
 
     # --- connessioni (web/auri-conn.js): rete vera del dispositivo, Bluetooth del browser, GPS ---
     def net_info(self):
-        return json.loads(str(js.auriNet()))
+        try:
+            return json.loads(str(js.auriNet()))
+        except Exception:
+            return {'online': True, 'tipo': '', 'eff': '', 'bars': 4, 'down': 0, 'bt': 0}
 
     def bt_set(self, on):
         pass        # il browser non lascia accendere/spegnere la radio: si ricorda solo la scelta
@@ -55,13 +58,22 @@ class WebHal:
         pass
 
     def loc_start(self):
-        js.auriLocStart()
+        try:
+            js.auriLocStart()
+        except Exception:
+            pass            # pagina senza GPS (vecchia o modalita' Nokia): loc_poll lo dice
 
     def loc_stop(self):
-        js.auriLocStop()
+        try:
+            js.auriLocStop()
+        except Exception:
+            pass
 
     def loc_poll(self):
-        return json.loads(str(js.auriLocPoll()))
+        try:
+            return json.loads(str(js.auriLocPoll()))
+        except Exception:
+            return {'on': False, 'err': 'no_gps', 'pos': None}
 
     def battery(self):
         # a stale cached page may lack the simulated battery: report full instead of crashing

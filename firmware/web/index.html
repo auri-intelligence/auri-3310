@@ -521,7 +521,16 @@ addEventListener('keyup', e => {
 (async () => {
   try {
     const { loadMicroPython } = await import(MP_URL);
-    mp = await loadMicroPython({ stdout: t => console.log(t), stderr: t => console.error(t) });
+    // #nokia: condizioni del telefono vero (ESP32-S3): memoria di MicroPython limitata (#nokia&heap=1024 in KB)
+    // e niente funzioni che esistono solo nel browser (cervello WebGPU, fotocamera e GPS del browser)
+    const NOKIA = location.hash.includes('nokia');
+    const heapKB = parseInt((/heap=(\d+)/.exec(location.hash) || [])[1] || '1024', 10);
+    if (NOKIA) {
+      for (const f of ['auriAiInfo', 'auriCamInfo', 'auriLocStart', 'auriHearStart']) delete window[f];
+      window.auriLog('nokia', `Condizioni Nokia: memoria MicroPython ${heapKB} KB, niente WebGPU/camera/GPS del browser`);
+    }
+    mp = await loadMicroPython(Object.assign({ stdout: t => console.log(t), stderr: t => console.error(t) },
+                                             NOKIA ? { heapsize: heapKB * 1024 } : {}));
     for (const dir of ['auri', 'apps', 'apps/giochi', 'hal']) mp.FS.mkdir('/' + dir);
     for (const f of FILES) {
       const r = await fetch('../' + f, { cache: 'no-store' });
@@ -575,7 +584,7 @@ s.shut()
     const perf = window.auriPerf = { step: 0, max: 0, draw: 0, n: 0 };
     setInterval(() => {
       const t0 = performance.now();
-      if (stepFn) { try { stepFn(); } catch (e) { window.auriErr('python', String(e.message || e).split('\n').slice(-3).join(' | ')); } }
+      if (stepFn) { try { (window.auriStepFn || stepFn)(); } catch (e) { window.auriErr('python', String(e.message || e).split('\n').slice(-3).join(' | ')); } }
       else py('s.step()');
       const dt = performance.now() - t0;
       if (dt > 300) window.auriWarn('lento', `Un passo di AurI OS ha richiesto ${Math.round(dt)} ms (app ${window.auriTop || '?'})`);

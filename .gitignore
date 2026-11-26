@@ -45,3 +45,6 @@ hardware/cervello/pesi/
 
 # chiave per leggere il registro del simulatore (segreta)
 tools/classifica/chiave_registro.txt
+
+# compilatore .mpy (venv e cache, si ricrea)
+tools/mpy/

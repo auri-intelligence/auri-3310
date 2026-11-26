@@ -101,7 +101,10 @@ class Home(App):
         p = min(1, (now - getattr(self, '_roll', 0)) / self.ROLL_MS)
         p = 1 - (1 - p) * (1 - p)
         x0, y0 = (W - 57) // 2, 12
-        tmp = Canvas()
+        tmp = getattr(self, '_tmp', None)
+        if tmp is None:
+            tmp = self._tmp = Canvas()      # una sola, riusata: niente memoria buttata 50 volte al secondo
+        tmp.clear()
         for i, ch in enumerate(digits):
             x = x0 + i * 12 + (9 if i >= 2 else 0)
             if p < 1 and ch != self._old[i]:
