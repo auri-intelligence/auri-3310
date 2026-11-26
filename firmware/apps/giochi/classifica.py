@@ -99,6 +99,14 @@ class NomeInput(App):
         softkey(g, 'OK')
 
 
+def riga(pos, nome, punti):
+    """'10 nome  12345' in 14 colonne: punti a destra, nome tagliato solo quanto serve, sempre uno spazio
+    in mezzo (prima '%-6s%d' attaccava nome e punti: 'lcalif76')."""
+    p = str(punti)
+    n = nome[:max(1, 14 - 3 - 1 - len(p))]
+    return '%2d %s%s%s' % (pos, n, ' ' * (14 - 3 - len(n) - len(p)), p)
+
+
 class Classifica(App):
     def __init__(self, sys, game, score):
         super().__init__(sys)
@@ -163,7 +171,7 @@ class Classifica(App):
             snake_load(g, self.sys.hal.ticks_ms(), 25, t('g_sending'))
             return
         header(g, t('g_world') if self.world else t('g_rank'))
-        lines = ['%2d %-6s%d' % (i + 1, e[1][:6], e[0]) for i, e in enumerate(self.rows)]
+        lines = [riga(i + 1, e[1], e[0]) for i, e in enumerate(self.rows)]
         if not lines:
             lines = ['-']
         if self.msg:

@@ -174,7 +174,7 @@ if (!window.AURI_LOCAL) {
   <div class="pill" id="status">Caricamento MicroPython...</div>
   <p>Gira lo stesso codice Python del telefono, in MicroPython compilato per il browser.</p>
   <p><kbd>&uarr;</kbd> <kbd>&darr;</kbd> scorri &middot; <kbd>Invio</kbd> Navi &middot; <kbd>Backspace</kbd> C &middot; <kbd>0</kbd>-<kbd>9</kbd> <kbd>*</kbd> <kbd>#</kbd></p>
-  <div class="row" style="align-items:center"><label><input type="checkbox" id="ghost" checked> Persistenza LCD</label><button id="btn3d">3D</button></div>
+  <div class="row" style="align-items:center"><button id="btn3d">3D</button></div>
   <div id="ctl3d">
     <div class="row"><button data-view="fronte">Fronte</button><button data-view="retro">Retro</button><button data-view="sinistra">Sinistra</button><button data-view="destra">Destra</button><button data-view="alto">Alto</button><button data-view="sotto">Sotto</button></div>
     <label>Smonta <input type="range" id="explode" min="0" max="1" step="0.01" value="0"></label>
@@ -396,7 +396,8 @@ function draw(now) {
   // al massimo 30 disegni al secondo: lo schermo vero non va piu' veloce e il telefono respira
   if (now - lastPaint < 30) return requestAnimationFrame(draw);
   lastPaint = now;
-  const a = $('ghost').checked ? 1 - Math.exp(-dt / TAU) : 1;
+  // niente scia (ghosting): ogni pixel passa subito al colore nuovo, anche nei giochi e nella fotocamera
+  const a = 1;
   const bg = lit ? BG_LIT : BG_DARK, fg = lit ? FG_LIT : FG_DARK;
   const w = lcd.width, h = lcd.height;
   // sfondo (gradiente) disegnato una volta sola e poi copiato: prima si ricreava a ogni fotogramma
@@ -549,7 +550,7 @@ addEventListener('keyup', e => {
     const sc = await fetch('classifica.txt', { cache: 'no-store' }).catch(() => null);
     const su = sc && sc.ok ? (await sc.text()).trim() : '';
     // nel banco di prova niente classifica mondiale: i punteggi delle prove non devono finire online
-    if (su.startsWith('https://') && !location.hash.includes('banco')) { const c3 = JSON.parse(cfg); c3.scores_url = su; cfg = JSON.stringify(c3); }
+    if (su.startsWith('https://') && (!location.hash.includes('banco') || location.hash.includes('classifica'))) { const c3 = JSON.parse(cfg); c3.scores_url = su; cfg = JSON.stringify(c3); }
     mp.FS.writeFile('/config.json', cfg);
     py(`
 import sys, json
