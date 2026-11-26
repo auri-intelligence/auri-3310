@@ -46,7 +46,10 @@ const log = t => {
 };
 const riga = (nome, ok, nota) => {
   const li = document.createElement('li');
-  li.innerHTML = `<b>${nome}</b><span class="${ok === null ? 'mu' : ok ? 'ok' : 'ko'}">${nota}</span>`;
+  // textContent: la nota puo' contenere messaggi d'errore del modello, mai interpretarli come HTML
+  const b = document.createElement('b'); b.textContent = nome;
+  const sp = document.createElement('span'); sp.className = ok === null ? 'mu' : ok ? 'ok' : 'ko'; sp.textContent = nota;
+  li.replaceChildren(b, sp);
   $('#esiti').appendChild(li);
   return li;
 };

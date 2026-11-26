@@ -23,6 +23,8 @@ class PCD8544:
         self.rst(1)
         self.cmd(0x21, 0x80 | board.LCD_VOP, 0x04, 0x14, 0x20, 0x0C)
 
+    _HOME = bytes((0x80, 0x40))   # cursore a 0,0: comando di ogni fotogramma, senza allocare
+
     def cmd(self, *c):
         self.dc(0)
         self.ce(0)
@@ -30,7 +32,10 @@ class PCD8544:
         self.ce(1)
 
     def show(self, buf):
-        self.cmd(0x80, 0x40)
+        self.dc(0)
+        self.ce(0)
+        self.spi.write(self._HOME)
+        self.ce(1)
         self.dc(1)
         self.ce(0)
         self.spi.write(buf)
@@ -417,6 +422,11 @@ class ESP32Hal:
     # disegnare e a leggere i tasti. auri/net.py le usa da sole quando la HAL le ha.
     def request_start(self, method, url, body=None, token=None):
         import _thread
+        if sum(1 for v in self._req.values() if v is None) >= 2:
+            raise OSError('rete occupata')      # ogni thread con TLS costa ~40 KB: non piu' di 2 insieme
+        if len(self._req) > 8:                  # risultati mai ritirati (app chiusa prima): si buttano
+            for k in [k for k, v in self._req.items() if v is not None]:
+                del self._req[k]
         self._req_n += 1
         rid = self._req_n
         self._req[rid] = None

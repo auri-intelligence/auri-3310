@@ -1,14 +1,10 @@
 from auri import i18n, keys
-from auri.ui import App, Menu, TextView, Confirm, header, softkey
+from auri.ui import App, Menu, TextView, Confirm, header, softkey, onoff
 from auri.gfx import W
 from auri.i18n import t
 from auri.settings import PROFILES
 from auri.sound import RINGTONES
 from auri.core import VERSION
-
-
-def onoff(v):
-    return t('on') if v else t('off')
 
 
 def submenu(sys, title, build):

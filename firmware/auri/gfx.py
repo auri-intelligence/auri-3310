@@ -354,7 +354,6 @@ if _fb is not None:
         else:
             self.fb.blit(fb, x, y, 1, _PAL0)   # chiave dopo la palette: 1 = sfondo trasparente
 
-    Canvas._char2x = _char2x_fb
 
     _GRANDI2 = {}
     _py_icon2 = Canvas.icon2
@@ -389,13 +388,20 @@ if _fb is not None:
         self.fb.fill_rect(0, y0, W, y1 - y0, 0)
         self.fb.blit(src.fb, 0, 0, 0)
 
-    Canvas.icon2 = _icon2
-    Canvas.blit = _blit
     _py_icon = Canvas.icon
-    Canvas.icon = _icon
-    Canvas.__init__ = _init
-    Canvas.pixel = _pixel
-    Canvas.hline = _hline
-    Canvas.vline = _vline
-    Canvas.fill_rect = _fill_rect
-    Canvas.char = _char
+
+    class _CanvasFB(Canvas):
+        """La tela del Nokia (e del browser): le operazioni piu' usate fatte in C da framebuf. I metodi in
+        Python di Canvas restano per i casi che framebuf non fa (xor, scale diverse) e per il PC."""
+        __init__ = _init
+        pixel = _pixel
+        hline = _hline
+        vline = _vline
+        fill_rect = _fill_rect
+        char = _char
+        _char2x = _char2x_fb
+        icon = _icon
+        icon2 = _icon2
+        blit = _blit
+
+    Canvas = _CanvasFB

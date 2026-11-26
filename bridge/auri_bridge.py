@@ -65,8 +65,6 @@ def msg(req, key):
     return MSG[key][LANG_ORDER.index(lang_of(req))]
 
 
-msg_text = msg
-
 
 def phone_prompt(req):
     if (req or {}).get('mode') == 'assist':
@@ -116,6 +114,7 @@ class Run:
         self.pending = {'id': self.id, 'text': desc}
         self.changed.set()
         ok = await self.answer
+        self.answer = None              # una seconda conferma sullo stesso id non deve rompere il loop
         self.pending = None
         if ok:
             return PermissionResultAllow()
@@ -134,17 +133,19 @@ class Run:
             can_use_tool=self.can_use_tool,
         )
         try:
-            async for msg in query(prompt=stream_prompt(r['text']), options=opts):
-                if isinstance(msg, AssistantMessage):
-                    for b in msg.content:
+            async for m in query(prompt=stream_prompt(r['text']), options=opts):
+                if isinstance(m, AssistantMessage):
+                    for b in m.content:
                         if isinstance(b, TextBlock) and b.text.strip():
                             self.text.append(b.text.strip())
-                elif isinstance(msg, ResultMessage):
-                    self.session = msg.session_id
-                    if msg.is_error and not self.text:
-                        self.error = msg.result or msg_text(self.req, 'error')
+                elif isinstance(m, ResultMessage):
+                    self.session = m.session_id
+                    if m.is_error and not self.text:
+                        self.error = m.result or msg(self.req, 'error')
         except Exception as e:
-            self.error = str(e)
+            # 11. il dettaglio (percorsi, URL, SDK) resta nel log del bridge, al telefono un messaggio chiaro
+            print('claude:', e, flush=True)
+            self.error = msg(self.req, 'error')
         self.done = True
         self.changed.set()
 
@@ -188,7 +189,7 @@ def start_chat(req):
 
 def confirm(req):
     run = runs.get(req.get('id'))
-    if not run or not run.answer:
+    if not run or not run.answer or run.answer.done():
         return {'reply': msg(req, 'expired'), 'session': req.get('session')}
     run.pending = None
     run.changed.clear()
@@ -418,7 +419,7 @@ def llm_assist(req):
             data = json.loads(resp.read())
     except Exception as e:
         print('llm:', e, flush=True)
-        return {'reply': msg(req, 'error'), 'error': str(e), 'session': sid}
+        return {'reply': msg(req, 'error'), 'error': 'server', 'session': sid}
     reply = ((data.get('choices') or [{}])[0].get('message') or {}).get('content') or ''
     if '</think>' in reply:
         reply = reply.split('</think>')[-1]
@@ -499,7 +500,7 @@ def gemini_call(key, req, steps):
             last = e
             if e.code not in (429, 500, 503):
                 raise
-    raise last
+    raise last or RuntimeError('nessun modello Gemini configurato')
 
 
 def step_text(step):
@@ -531,7 +532,7 @@ def gemini_assist(req):
                               'result': [{'type': 'text', 'text': res}]})
     except Exception as e:
         print('gemini:', e, flush=True)
-        return {'reply': msg(req, 'error'), 'error': str(e), 'session': sid}
+        return {'reply': msg(req, 'error'), 'error': 'server', 'session': sid}
     # Model steps are resent verbatim, as the Interactions API asks in stateless mode.
     kept = steps[-GEMINI_HISTORY:]
     while kept and kept[0].get('type') != 'user_input':

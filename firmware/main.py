@@ -18,6 +18,9 @@ s = System(hal, cfg)
 # woken by the Power key (or first power-up): real start-up sequence
 s.power_on()
 synced = False
+import time
+PASSO = 20                                   # ms: il sistema e i giochi contano su un ritmo regolare
+prossimo = time.ticks_ms()
 while True:
     if not synced and wlan.isconnected():
         try:
@@ -26,4 +29,11 @@ while True:
         except OSError:
             pass
     s.step()
-    hal.sleep_ms(20)
+    # passo fisso: si dorme solo il tempo che avanza (prima 20 ms fissi in piu' del lavoro, quindi i giochi
+    # rallentavano quando il passo era pesante); se si e' in ritardo non si accumula
+    prossimo = time.ticks_add(prossimo, PASSO)
+    resto = time.ticks_diff(prossimo, time.ticks_ms())
+    if resto > 0:
+        hal.sleep_ms(resto)
+    else:
+        prossimo = time.ticks_ms()

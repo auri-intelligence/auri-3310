@@ -33,15 +33,23 @@ class Sensori(App):
             g.text_center(t('no_sensors'), 22)
 
 
+_tel = None
+
+
 def push_telemetry(sys):
-    # Sent by the home screen every few minutes; failures are silent so the phone keeps working offline.
+    # Mandata dalla Home ogni pochi minuti, in background (prima bloccava la Home se il bridge era spento).
+    # Gli errori non disturbano: il telefono funziona anche senza casa.
+    global _tel
     cfg = sys.config
     if not cfg.get('bridge_url'):
         return
+    if _tel is not None and not _tel.poll():
+        return                      # la precedente e' ancora in corso
     try:
+        from auri.net import Richiesta
         data = dict(sys.hal.sensors())
         data.pop('tilt', None)
         data['battery'] = sys.hal.battery_level() * 25
-        sys.hal.request('POST', cfg['bridge_url'] + '/v1/sensors', data, cfg.get('token'))
+        _tel = Richiesta(sys.hal, 'POST', cfg['bridge_url'] + '/v1/sensors', data, cfg.get('token'))
     except Exception:
-        pass
+        _tel = None

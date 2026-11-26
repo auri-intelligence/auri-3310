@@ -45,12 +45,23 @@ class System:
     def pop(self):
         if len(self.stack) > 1:
             self._chiudi(self.stack.pop())
+            self._pulisci_memoria()
         self.dirty = True
 
     def home(self):
         while len(self.stack) > 1:
             self._chiudi(self.stack.pop())
+        self._pulisci_memoria()
         self.dirty = True
+
+    @staticmethod
+    def _pulisci_memoria():
+        # al cambio di schermata si raccoglie la memoria: meglio qui che a meta' di una partita
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
 
     @staticmethod
     def _chiudi(app):

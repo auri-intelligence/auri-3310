@@ -9,6 +9,15 @@
     (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
   let stream = null, video = null, err = '', facing = mobile ? 'environment' : 'user';
   let mode = 0, frame = '', seq = 0, busy = false, handle = 0;
+  // riduzione in due passi (prima a 168x96, poi 84x48): un salto solo da 320x240 fa moire'
+  const mid = document.createElement('canvas');
+  mid.width = W * 2; mid.height = H * 2;
+  const mx = mid.getContext('2d');
+  mx.imageSmoothingEnabled = true; mx.imageSmoothingQuality = 'high';
+  // contrasto con memoria (niente "pompaggio" fotogramma per fotogramma) e isteresi sui pixel (niente
+  // sfarfallio dei puntini fermi): da docs/ricerca/fotocamera.md
+  let cLo = -1, cHi = 255;
+  const prev = new Uint8Array(W * H);
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const cx = cv.getContext('2d', { willReadFrequently: true });
@@ -24,9 +33,11 @@
     let sw = vw, sh = vw * H / W;
     if (sh > vh) { sh = vh; sw = vh * W / H; }
     const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+    mx.drawImage(video, sx, sy, sw, sh, 0, 0, W * 2, H * 2);
     cx.save();
     if (facing === 'user') { cx.translate(W, 0); cx.scale(-1, 1); }   // la webcam fa da specchio
-    cx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
+    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+    cx.drawImage(mid, 0, 0, W * 2, H * 2, 0, 0, W, H);
     cx.restore();
     const px = cx.getImageData(0, 0, W, H).data;
     // grigio + istogramma per il contrasto automatico (scarta l'1% piu' scuro e piu' chiaro)
@@ -40,15 +51,19 @@
     while (lo < 255 && (acc += hist[lo]) < cut) lo++;
     acc = 0;
     while (hi > 0 && (acc += hist[hi]) < cut) hi--;
-    const span = Math.max(24, hi - lo);
-    for (let i = 0; i < W * H; i++) gray[i] = Math.min(255, Math.max(0, (gray[i] - lo) * 255 / span));
+    if (cLo < 0) { cLo = lo; cHi = hi; } else { cLo += (lo - cLo) * 0.15; cHi += (hi - cHi) * 0.15; }
+    const span = Math.max(24, cHi - cLo);
+    for (let i = 0; i < W * H; i++) gray[i] = Math.min(255, Math.max(0, (gray[i] - cLo) * 255 / span));
     out.fill(0);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const i = y * W + x, v = gray[i];
         let on;
-        if (mode === 1) on = v < (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) * 16;
-        else if (mode === 2) on = v < 128;
+        if (mode === 1) {
+          const soglia = (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) * 16;
+          // isteresi: un pixel cambia solo se si allontana di 12 dalla soglia, cosi' quelli fermi non tremano
+          on = prev[i] ? v < soglia + 12 : v < soglia - 12;
+        } else if (mode === 2) on = prev[i] ? v < 140 : v < 116;
         else {
           on = v < 128;
           const e = (v - (on ? 0 : 255)) / 8;   // Atkinson: 6/8 dell'errore su 6 vicini
@@ -61,6 +76,7 @@
           }
           if (y + 2 < H) gray[i + 2 * W] += e;
         }
+        prev[i] = on ? 1 : 0;
         if (on) out[(y >> 3) * W + x] |= 1 << (y & 7);   // 1 = pixel nero, come il display
       }
     }
@@ -77,6 +93,7 @@
   }
 
   async function open() {
+    cLo = -1;                      // camera nuova: il contrasto riparte da zero
     close();
     err = ''; busy = true;
     if (!window.isSecureContext) { err = 'no_https'; busy = false; return; }

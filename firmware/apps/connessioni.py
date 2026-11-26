@@ -1,12 +1,8 @@
 # Impostazioni > Connessioni: Wi-Fi, Bluetooth, Posizione e Modalita' aereo.
 # Simulatore: la rete e il GPS veri del dispositivo (web/auri-conn.js). Nokia vero: WLAN e BLE dell'ESP32,
 # la posizione arriva dal telefono vero solo con un modulo GPS (per ora non previsto) o dal bridge.
-from auri.ui import App, Menu, header, softkey, snake_load
+from auri.ui import App, Menu, header, softkey, snake_load, onoff
 from auri.i18n import t
-
-
-def onoff(v):
-    return t('on') if v else t('off')
 
 
 def net(sys):

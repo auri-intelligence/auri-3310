@@ -226,5 +226,10 @@ class WebHal:
         except ValueError:
             return default
 
+    SEGRETI = ('token', 'wifi_password', 'password', 'scores_key')
+
     def save(self, name, obj):
+        # il localStorage e' in chiaro: chiavi segrete mai salvate, anche se un'app per sbaglio le passa
+        if isinstance(obj, dict) and any(k in obj for k in self.SEGRETI):
+            obj = {k: v for k, v in obj.items() if k not in self.SEGRETI}
         js.auriSave(name, json.dumps(obj))

@@ -265,3 +265,8 @@ def snake_load(g, now, cy=24, label=None):
     g.pixel(ax, ay + 2)
     if label:
         g.text_center(label, cy + 10)
+
+
+def onoff(v):
+    """'si'/'no' tradotto: usato da tutti i menu di impostazioni."""
+    return t('on') if v else t('off')
