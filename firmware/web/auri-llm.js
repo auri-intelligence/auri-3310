@@ -136,7 +136,9 @@
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => window.auriLog('cervello', 'Spazio persistente: ' + (ok ? 'si' : 'no'))); } catch (e) {}
       // Sui browser dei telefoni la memoria della GPU e' limitata (buffer da 128 MB): con una
       // finestra di contesto piu' corta il modello ci sta, con quella piena fallisce e basta.
-      const chatOpts = { context_window_size: MOBILE ? 1024 : 2048 };
+      // prefill a pezzi piccoli sul telefono: la GPU fa lavori brevi e tra uno e l'altro lo schermo si aggiorna
+      // (con pezzi grandi la GPU resta occupata per secondi e lo snake d'attesa si congela)
+      const chatOpts = MOBILE ? { context_window_size: 1024, prefill_chunk_size: 128 } : { context_window_size: 2048 };
       // Dove salvare il modello: la Cache API sui telefoni spesso fallisce ("Cache.add() encountered a
       // network error", visto nel registro di un Android 10); IndexedDB invece regge. Sul telefono si usa
       // subito IndexedDB, altrove si prova la cache e, se fallisce, si riprova da soli con IndexedDB.
@@ -293,6 +295,9 @@
       const out = await engine.chat.completions.create(req);
       for await (const chunk of out) {
         if (mine !== gen) return;
+        // sul telefono un respiro di un fotogramma tra un pezzo e l'altro: il worker genera solo quando
+        // gli si chiede il pezzo dopo, cosi' la GPU si libera e il display non si blocca mai (~10% piu' lento)
+        if (MOBILE) await new Promise(r => setTimeout(r, 16));
         if (stop) {
           try { await engine.interruptGenerate(); } catch (e) {}
           break;

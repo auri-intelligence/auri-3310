@@ -81,20 +81,19 @@ def riempitivo():
 # Se il modello ci mette tanto, AurI tiene compagnia: frasi che girano sul display (corte, 14 colonne)
 # e ogni tanto una detta a voce. Prima c'era solo "Sto pensando" con un puntino: sembrava bloccato.
 ATTESA = {
-    'it': (('Ci penso...', 'Ci sto pensando, un attimo.'),
-           ('Cerco parole', 'Sto cercando le parole giuste.'),
+    # solo frasi d'attesa: niente spiegazioni su come funziona (sul display sembravano messaggi del sistema)
+    'it': (('Ci penso...', 'Ci sto pensando.'),
+           ('Un attimo...', 'Un attimo e ci sono.'),
+           ('Sto pensando', 'Sto ancora pensando.'),
            ('Quasi...', 'Ci sono quasi.'),
-           ('Tutto qui!', 'Ho un cervello tutto mio, gira qui dentro.'),
-           ('Niente server', 'Nessun server: penso solo con questo telefono.'),
-           ('Del 2000!', 'Non male per un telefono del duemila.'),
-           ('Metto ordine', 'Metto in ordine i pensieri.'),
-           ('Ancora poco', 'Ancora un momento.')),
-    'en': (('Thinking...', 'Thinking, one moment.'),
-           ('Finding words', 'Looking for the right words.'),
+           ('Aspetta...', 'Aspetta ancora un attimo.'),
+           ('Ancora poco', 'Ancora un momento.'),
+           ('Ci sono!', 'Eccomi, quasi pronto.')),
+    'en': (('Thinking...', 'Thinking.'),
+           ('One sec...', 'One second.'),
+           ('Still on it', 'Still thinking.'),
            ('Almost...', 'Almost there.'),
-           ('All in here!', 'My brain runs right here, inside this phone.'),
-           ('No servers', 'No servers: I think with this phone only.'),
-           ('From 2000!', 'Not bad for a phone from the year two thousand.'),
+           ('Hold on...', 'Hold on a moment.'),
            ('Nearly done', 'Just a moment more.')),
 }
 

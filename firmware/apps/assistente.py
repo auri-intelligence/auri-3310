@@ -35,7 +35,7 @@ class Assistente(App):
         self.state = 'idle'
         if self.brain.motore() is None:
             self.state = 'none'
-            self.lines = wrap(t('no_brain_web') if sys.config.get('online') else t('no_brain'))
+            self.lines = self._wrap(t('no_brain_web') if sys.config.get('online') else t('no_brain'))
         elif not self.brain.pronto():
             self.state = 'off'
         elif trigger is not None:
@@ -101,8 +101,8 @@ class Assistente(App):
 
     def _show(self):
         txt = self.brain.text or self.brain.error or t('no_answer')
-        self.lines = (wrap('"' + self.heard + '"') if self.heard else []) + wrap(txt)
-        self.pos = max(0, len(self.lines) - 3)
+        self.lines = (self._wrap('"' + self.heard + '"') if self.heard else []) + self._wrap(txt)
+        self.pos = max(0, len(self.lines) - self._nr())
         self.state = 'show'
 
     # --- tasti -------------------------------------------------------------
@@ -160,7 +160,7 @@ class Assistente(App):
         if k == keys.UP:
             self.pos = max(0, self.pos - 1)
         else:
-            self.pos = min(max(0, len(self.lines) - 3), self.pos + 1)
+            self.pos = min(max(0, len(self.lines) - self._nr()), self.pos + 1)
 
     def on_long(self, k):
         if self.state in ('idle', 'show', 'type') and k in (keys.NAVI, keys.POWER):
@@ -209,7 +209,7 @@ class Assistente(App):
                 self.state = 'none'
                 err = info.get('error') or ''
                 noti = ('no_webgpu', 'no_https')      # cause che sappiamo spiegare in poche parole
-                self.lines = wrap(t(err) if err in noti else t('error') + ': ' + err)
+                self.lines = self._wrap(t(err) if err in noti else t('error') + ': ' + err)
                 return True
             return True
         if self.state == 'listen':
@@ -252,8 +252,8 @@ class Assistente(App):
                 return True       # lo snake gira: si ridisegna sempre
             if self.brain.text != self._last:
                 self._last = self.brain.text
-                self.lines = wrap(self.brain.text)
-                self.pos = max(0, len(self.lines) - 3)
+                self.lines = self._wrap(self.brain.text)
+                self.pos = max(0, len(self.lines) - self._nr())
             if self.brain.done:
                 if self.brain.da_leggere():
                     self.brain.leggi(self.brain.text)
@@ -310,6 +310,14 @@ class Assistente(App):
             st.set(ai_voice=not st['ai_voice'])
             sys.pop()
 
+        def testo():
+            st.set(testo_piccolo=not st['testo_piccolo'])
+            txt = self.brain.text
+            if txt and self.state in ('idle', 'show'):
+                self.lines = self._wrap(txt)
+                self.pos = max(0, len(self.lines) - self._nr())
+            sys.pop()
+
         def nuova():
             self.brain.storia = []
             self.brain.session = None
@@ -322,6 +330,7 @@ class Assistente(App):
         voci = [
             (t('ai_engine') + ': ' + self._engine_label(), motore),
             (t('ai_voice') + ' ' + (t('on') if st['ai_voice'] else t('off')), voce),
+            (t('text_size') + ': ' + t('text_small' if st['testo_piccolo'] else 'text_big'), testo),
             (t('new_session'), nuova),
         ]
         if self.brain.motore() == LOCALE:
@@ -341,12 +350,27 @@ class Assistente(App):
         for x in range(0, W, 2):
             g.pixel(x, 9)
 
+    # testo delle risposte: piccolo (3x5, 4 righe da 20 lettere) o grande (5x8, 3 righe da 14)
+    def _piccolo(self):
+        return self.sys.settings['testo_piccolo']
+
+    def _nr(self):
+        return 4 if self._piccolo() else 3
+
+    def _lh(self):
+        return 7 if self._piccolo() else 9
+
+    def _wrap(self, s):
+        return wrap(s, 20 if self._piccolo() else 14)
+
     def _body(self, g, lines, pos):
-        for i, line in enumerate(lines[pos:pos + 3]):
-            g.text(line, 0, 11 + i * 9)
-        if len(lines) > 3:
-            h = max(4, 27 * 3 // len(lines))
-            g.vline(W - 1, 11 + (27 - h) * pos // max(1, len(lines) - 3), h)
+        nr, lh = self._nr(), self._lh()
+        scrivi = g.text_small if self._piccolo() else g.text
+        for i, line in enumerate(lines[pos:pos + nr]):
+            scrivi(line, 0, 11 + i * lh)
+        if len(lines) > nr:
+            h = max(4, 27 * nr // len(lines))
+            g.vline(W - 1, 11 + (27 - h) * pos // max(1, len(lines) - nr), h)
 
     def draw(self, g):
         self._head(g)
@@ -388,7 +412,7 @@ class Assistente(App):
             if self.lines:
                 self._body(g, self.lines, self.pos)
                 if self.blink:
-                    g.fill_rect(W - 4, 11 + min(2, len(self.lines) - 1 - self.pos) * 9 + 6, 3, 2)
+                    g.fill_rect(W - 4, 11 + min(self._nr() - 1, len(self.lines) - 1 - self.pos) * self._lh() + self._lh() - 3, 3, 2)
             else:
                 from auri.cervello import attesa
                 from auri.ui import snake_load

@@ -144,6 +144,24 @@ class Canvas:
             x += font.ADV * scale
         return x
 
+    def text_small(self, s, x, y, c=1):
+        # carattere piccolo 3x5 (auri/font_small.py): 4 pixel a lettera invece di 6
+        from auri import font_small as fs
+        pix = self.pixel
+        P = fs.PUNTI
+        for ch in s:
+            o = ord(ch)
+            if o > 126:
+                ch = FOLD.get(ch, '?')
+                o = ord(ch)
+            elif o < 32:
+                o = 63
+            dy = y + 1 if ch in fs.GIU else y
+            for i, j in P[o - 32]:
+                pix(x + i, dy + j, c)
+            x += fs.ADV
+        return x
+
     def text_center(self, s, y, c=1, scale=1):
         self.text(s, (W - text_width(s, scale)) // 2, y, c, scale)
 

@@ -3,7 +3,7 @@ DEFAULTS = {
     'light_s': 15, 'boot_anim': True, 'clock24': True, 'welcome': '',
     # cervello dell'assistente: 'auto' (il bridge se c'e', altrimenti il modello locale),
     # 'locale' (sempre il modello del dispositivo), 'bridge' (sempre quello di casa)
-    'wifi': True, 'bt': False, 'gps': False, 'aereo': False,
+    'wifi': True, 'bt': False, 'gps': False, 'aereo': False, 'testo_piccolo': True,
     'brain': 'auto', 'ai_model': 'auto', 'ai_voice': True,
 }
 

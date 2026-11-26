@@ -104,10 +104,15 @@ def Impostazioni(sys):
             st.set(boot_anim=not st['boot_anim'])
             refresh(sys)
 
+        def testo():
+            st.set(testo_piccolo=not st['testo_piccolo'])
+            refresh(sys)
+
         ls = st['light_s']
         return [
             ('1 %s %s' % (t('backlight'), ('%ds' % ls) if ls else t('always')), light),
             ('2 %s %s' % (t('boot_anim'), onoff(st['boot_anim'])), anim),
+            ('3 %s %s' % (t('text_size'), t('text_small' if st['testo_piccolo'] else 'text_big')), testo),
         ]
 
     def cervello():
