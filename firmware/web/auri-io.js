@@ -44,22 +44,30 @@
 
   let ctx, stream, node, chunks = [], result = '', recording = false;
 
-  // Chrome keeps an AudioContext suspended unless it is created or resumed inside a user gesture,
-  // and push-to-talk starts from the simulator loop, so the audio graph is prepared on the first click/key.
+  // Il microfono si apre SOLO mentre si tiene premuto e si chiude al rilascio: se restasse aperto, sui telefoni
+  // ruberebbe l'audio al riconoscimento vocale (AurI "non sente") e il sistema segnalerebbe un sito in ascolto.
+  // Al primo tocco si prepara solo l'AudioContext (Chrome lo vuole dentro un gesto), mai il microfono.
   async function prepare() {
     if (!ctx) ctx = new AudioContext();
     if (ctx.state !== 'running') await ctx.resume();
     if (!stream) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (!recording) { chiudi(); return; }
       const src = ctx.createMediaStreamSource(stream);
       node = ctx.createScriptProcessor(4096, 1, 1);
       node.onaudioprocess = e => { if (recording) chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
       src.connect(node); node.connect(ctx.destination);
     }
   }
-  const gesture = () => prepare().catch(e => { result = JSON.stringify({ error: 'Microfono: ' + e.message }); });
+  function chiudi() {
+    try { if (node) node.disconnect(); } catch (e) {}
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    node = null; stream = null;
+  }
+  const gesture = () => { try { if (!ctx) ctx = new AudioContext(); ctx.resume(); } catch (e) {} };
   addEventListener('pointerdown', gesture, { once: true });
   addEventListener('keydown', gesture, { once: true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { recording = false; chiudi(); } });
 
   window.auriVoiceStart = () => {
     chunks = []; result = '';
@@ -81,6 +89,7 @@
 
   window.auriVoiceStop = (url, params, token) => {
     recording = false;
+    chiudi();
     if (result) return;
     if (!chunks.length) { result = JSON.stringify({ error: 'Audio vuoto: controlla il microfono' }); return; }
     const body = Object.assign(JSON.parse(params), { audio: pcm16k(), rate: 16000 });
