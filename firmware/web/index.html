@@ -299,6 +299,8 @@ $('toggle').addEventListener('click', () => setPanel(document.body.classList.con
 
 const target = new Uint8Array(W * H), level = new Float32Array(W * H);
 let litUntil = 0, lastFrame = performance.now();
+// per il banco ESP32 in 3D (banco3d.html): i pixel del display e la luce, letti dal telefono 3D
+window.auriPixel = () => target; window.auriAcceso = () => performance.now() < litUntil;
 
 let lastHex = '';
 window.auriShow = hex => {

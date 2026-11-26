@@ -92,7 +92,7 @@ const INFO = {
   lcd: ["Display ORIGINALE del 3310 (PCD8544) su basetta adattatrice", "vetro ~38 x 34 mm (da misurare col calibro); basetta millefori ~44 x 43 mm con strip 8 pin", "2,7-3,3 V", "https://www.sparkfun.com/datasheets/LCD/Monochrome/Nokia5110.pdf", "Riuso dal telefono: è lo stesso chip del modulo 5110. Ha contatti a molla, non pin: si appoggia su piazzole della basetta (o fili sottili saldati). Sul banco meglio un modulo 5110 da 3-4 euro, l’originale solo nel telefono finito (se si rompe non si ricompra)."],
   sd: ['Modulo microSD SPI (3,3 V)', '~24 x 32 mm (approssimato), 6 pin', '3,3 V', 'https://www.sdcard.org/downloads/pls/', 'Bus SPI3 separato dal display. I moduli con regolatore AMS1117 vogliono 5 V su VCC: qui si usa un modulo da 3,3 V.'],
   keypad: ["Tastiera ORIGINALE del 3310: gomma + lamina a cupole su millefori", "basetta ~45 x 60 mm (da misurare sul tappetino), piste incrociate sotto ogni cupola, 8 fili", "passiva (pull-up interni dell’ESP32)", "https://it.wikipedia.org/wiki/Tastiera_a_matrice", "Riuso dal telefono: gomma e lamina sono quelle vere, si rifanno solo le piste sotto (due pettini per tasto). Matrice 4x4 come KEYMAP in board.py: righe 1-4, colonne 5-8."],
-  mic: ['Microfono I2S INMP441 (breakout)', 'scheda tonda ~14 mm (approssimato), capsula 4,72 x 3,76 x 1 mm', '1,8-3,3 V', 'https://invensense.tdk.com/products/digital/inmp441/', 'L/R a GND = canale sinistro. Pin dati I2S da fissare in board.py.'],
+  mic: ['NUOVO · Microfono I2S INMP441 (breakout)', 'scheda tonda ~14 mm (approssimato), capsula 4,72 x 3,76 x 1 mm', '1,8-3,3 V', 'https://invensense.tdk.com/products/digital/inmp441/', 'L/R a GND = canale sinistro. Pin dati I2S da fissare in board.py.'],
   amp: ['Amplificatore I2S MAX98357A + altoparlante', 'breakout ~17,8 x 19,3 mm (approssimato); altoparlante 28 mm 8 ohm', '2,5-5,5 V (qui 3,3 V)', 'https://www.analog.com/en/products/max98357a.html', 'Arriva dopo il piezo. Pin I2S da fissare in board.py.'],
   vibra: ['Vibrazione: motorino ORIGINALE del 3310 + NPN + diodo', 'motorino 10 x 2,7 mm; NPN TO-92 4,6 x 3,6 mm; R 1 kohm; 1N4148 DO-35', '3 V, ~70 mA (troppi per un GPIO: serve il transistor)', 'https://www.onsemi.com/pdf/datasheet/p2n2222a-d.pdf', 'GPIO 6 -> 1 kohm -> base. Emettitore a GND, collettore al meno del motore, diodo in antiparallelo (fascia verso il +).'],
   piezo: ['Cicalino ORIGINALE del 3310 (o piezo passivo 12 mm)', 'cicalino originale ~13 mm (da misurare); piezo 12 x 9,5 mm', '3-5 V', 'https://en.wikipedia.org/wiki/Piezoelectric_speaker', 'Riuso dal telefono per i bip. GPIO 47 (SPEAKER) fa i toni con il PWM. Per la voce serve comunque il MAX98357A.'],
@@ -751,100 +751,189 @@ variante('usb');
 // Il telefono e' disteso a faccia in su: display verso -z (in alto), USB-C verso +z (in basso).
 const gFin = new THREE.Group(); gFin.visible = false; scene.add(gFin);
 const FIN_INFO = {
-  retro: ['Cover posteriore originale', '~113 x 48 mm, alta ~12 mm', 'Si riusa quella vera: dentro ci stanno batteria e scheda. Lo sportello resta come prima.'],
-  bat: ['Batteria BLC-2 originale (o LiPo 603450)', '~53 x 39 x 8 mm, 3,7 V ~1000 mAh', 'Nel telefono finito la batteria torna: contatti a molla della scheda come l’originale, caricatore (tipo TP4056 + protezione) gia stampato sulla scheda.'],
-  pcb: ['Scheda su misura (PCB)', '~44 x 100 x 1 mm, sagoma della scheda madre originale (DA MISURARE: foto dall’alto con un righello accanto)', 'Si disegna una volta e la si fa stampare E assemblare (JLCPCB/PCBWay): arriva con tutti i chip gia saldati, a mano non si salda niente.'],
-  esp: ['Modulo ESP32-S3-WROOM-1 N8R8', '18 x 25,5 x 3,1 mm', 'Montato dalla fabbrica (assemblaggio PCB). L’antenna va lasciata sul bordo, senza rame sotto, lontana dalle parti metalliche della cover.'],
-  sd: ['Slot microSD a molla', '~14 x 15 x 1,8 mm', 'Montato dalla fabbrica. Si raggiunge togliendo la batteria, come la SIM.'],
+  retro: ['ORIGINALE · Cover posteriore', '~113 x 48 mm, alta ~12 mm', 'Si riusa quella vera: dentro ci stanno batteria e scheda. Lo sportello resta come prima.'],
+  bat: ['ORIGINALE · Batteria BLC-2 (facoltativa)', '~56 x 40 x 5 mm (dalla scansione), 3,7 V', 'Si può togliere: il telefono va anche col caricatore originale o con la USB-C. Se c’è, appoggia sui contatti a molla come prima.'],
+  telaio: ['ORIGINALE · Telaio posteriore', '~47 x 113 mm (dalla scansione)', 'Si riusa com’è: tiene la scheda e fa da vano batteria.'],
+  ui: ['ORIGINALE · Telaio bianco con il display', '~45 x 107 mm (dalla scansione)', 'Si riusa: tiene il display e l’altoparlante; i fori lasciano passare i tasti.'],
+  pcb: ['NUOVO · Scheda AurI (PCB)', '46 x 109 x 1 mm: sagoma presa dalla scansione a 600 dpi della scheda originale', 'Si disegna una volta e la si fa stampare E assemblare (JLCPCB/PCBWay): arriva con tutti i chip gia saldati, a mano non si salda niente.'],
+  esp: ['NUOVO · Modulo ESP32-S3-WROOM-1 N8R8', '18 x 25,5 x 3,1 mm', 'Montato dalla fabbrica (assemblaggio PCB). L’antenna va lasciata sul bordo, senza rame sotto, lontana dalle parti metalliche della cover.'],
+  sd: ['NUOVO · Slot microSD a molla', '~14 x 15 x 1,8 mm', 'Montato dalla fabbrica. Si raggiunge togliendo la batteria, come la SIM.'],
   mic: ['Microfono INMP441 (solo il chip, senza basetta)', '4,72 x 3,76 x 1 mm', 'Montato dalla fabbrica vicino al foro del microfono originale, in basso.'],
-  amp: ['MAX98357A (chip) + altoparlantino 15 mm', 'chip 3 x 3 mm; altoparlante ~15 mm', 'Chip montato dalla fabbrica; l’altoparlante si appoggia su piazzole a molla, dove stava l’auricolare originale.'],
-  usb: ['USB-C al posto della presa del caricatore', 'presa ~9 x 3,2 x 7,4 mm', 'In basso, dove c’era la presa tonda: va allargato il foro della cover (lima) o stampato un adattatore.'],
-  lcd: ['Display ORIGINALE 3310', 'vetro ~38 x 34 mm (da misurare)', 'Non si salda: i suoi contatti a molla premono sulle 8 piazzole dorate della scheda, tenuti dal telaio come nell’originale.'],
-  pad: ['Piazzole del display', '8 piazzole dorate in fila', 'Stampate sulla scheda con la stessa posizione dell’originale (da copiare dalla scheda vecchia).'],
-  piste: ['Piste dei tasti', 'due pettini incrociati sotto ogni cupola', 'Stampate sulla scheda (dorate, ENIG): la cupola che si schiaccia chiude il contatto. Zero saldature.'],
-  cupole: ['Lamina a cupole ORIGINALE', 'foglio adesivo con le cupole metalliche', 'Si stacca dalla scheda vecchia e si incolla sulla nuova, centrando ogni cupola sulle piste.'],
-  gomma: ['Tastiera in gomma ORIGINALE', 'tappetino dei tasti', 'Si appoggia sopra la lamina, come prima.'],
-  vibra: ['Motorino ORIGINALE', '~10 x 2,7 mm', 'Su piazzole a molla della scheda (o due fili corti). Pilotato da transistor + diodo stampati sulla scheda.'],
-  buzz: ['Cicalino ORIGINALE', '~13 mm', 'Su piazzole a molla, nella stessa posizione dell’originale.'],
-  fronte: ['Cover frontale originale', '~113 x 48 mm', 'Si chiude sopra tutto come prima: nessuna modifica, tranne la presa USB-C in basso.'],
+  amp: ['NUOVO · MAX98357A (chip) + altoparlantino 15 mm', 'chip 3 x 3 mm; altoparlante ~15 mm', 'Chip montato dalla fabbrica; l’altoparlante si appoggia su piazzole a molla, dove stava l’auricolare originale.'],
+  usb: ['NUOVO · USB-C al posto della presa del caricatore', 'presa ~9 x 3,2 x 7,4 mm', 'In basso, dove c’era la presa tonda: va allargato il foro della cover (lima) o stampato un adattatore.'],
+  lcd: ['ORIGINALE · Display 3310', 'vetro ~38 x 34 mm (da misurare)', 'Non si salda: i suoi contatti a molla premono sulle 8 piazzole dorate della scheda, tenuti dal telaio come nell’originale.'],
+  pad: ['NUOVO · Piazzole del display', '8 piazzole dorate in fila', 'Stampate sulla scheda con la stessa posizione dell’originale (da copiare dalla scheda vecchia).'],
+  piste: ['NUOVO · Piste dei tasti', 'stesse posizioni della scheda originale (copiate dalla scansione)', 'Stampate sulla scheda (dorate, ENIG): la cupola che si schiaccia chiude il contatto. Zero saldature.'],
+  cupole: ['ORIGINALE · Lamina a cupole', 'foglio adesivo con le cupole metalliche', 'Si stacca dalla scheda vecchia e si incolla sulla nuova, centrando ogni cupola sulle piste.'],
+  gomma: ['ORIGINALE · Tastiera in gomma', 'tappetino dei tasti', 'Si appoggia sopra la lamina, come prima.'],
+  vibra: ['ORIGINALE · Motorino', '~10 x 2,7 mm', 'Su piazzole a molla della scheda (o due fili corti). Pilotato da transistor + diodo stampati sulla scheda.'],
+  buzz: ['ORIGINALE · Cicalino', '~13 mm', 'Su piazzole a molla, nella stessa posizione dell’originale.'],
+  fronte: ['ORIGINALE · Cover frontale', '~113 x 48 mm', 'Si chiude sopra tutto come prima: nessuna modifica, tranne la presa USB-C in basso.'],
 };
 const FIN = {};   // id -> gruppo dello strato (per esplodere)
 function strato(id, baseY, passo) { const g = new THREE.Group(); g.userData.fin = id; g.userData.base = baseY; g.userData.passo = passo; gFin.add(g); FIN[id] = g; g.position.y = baseY; return g; }
 const finMat = (c, o) => mat(c, o);
-{ // cover posteriore aperta
-  const g = strato('retro', 0, 0), Wc = 48, Lc = 113, Hc = 12, t = 1.6, col = 0x1f2a44;
-  bx(Wc, t, Lc, col, 0, 0, 0, g);
-  bx(t, Hc, Lc, col, -Wc / 2 + t / 2, 0, 0, g); bx(t, Hc, Lc, col, Wc / 2 - t / 2, 0, 0, g);
-  bx(Wc, Hc, t, col, 0, 0, -Lc / 2 + t / 2, g); bx(Wc, Hc, t, col, 0, 0, Lc / 2 - t / 2, g);
-  bx(9, 3.5, t + 0.2, 0x0f1115, 0, 3, Lc / 2 - t / 2, g);   // foro allargato per la USB-C
+// Strati veri: texture dalle scansioni del telefono smontato (tools/prepara_texture_finito.py -> tex/finito/).
+// Ogni strato = faccia sopra + faccia sotto + "fette" scure in mezzo che fanno da bordo (spessore vero).
+// Telefono a faccia in su: display verso -z, USB-C verso +z. Misure in mm prese dalle scansioni a 600 dpi.
+const TEXL = new THREE.TextureLoader();
+const texF = n => { const t = TEXL.load('tex/finito/' + n + '.webp'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, ANISO); return t; };
+function faccia(g, tex, w, l, y, sotto, o = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: o.r ?? 0.55, metalness: o.m ?? 0, color: o.c ?? 0xffffff }));
+  if (sotto) m.rotation.set(Math.PI / 2, 0, Math.PI); else m.rotation.x = -Math.PI / 2;
+  m.position.y = y; g.add(m); return m;
 }
-{ const g = strato('bat', 2, 18); bx(39, 8, 53, 0x2b2f36, 0, 0, -8, g); texPlane(37, 51, 10, (c, w, d) => { c.fillStyle = '#2b2f36'; c.fillRect(0, 0, w, d); txt(c, 'BLC-2', w / 2, d / 2 - 4, 5, '#ddd'); txt(c, 'o LiPo 603450', w / 2, d / 2 + 3, 2.6, '#bbb', 0, 'center', false); }, 0, 8.01, -8, g); }
-{ // scheda su misura: sotto i chip, sopra piste e piazzole
-  const g = strato('pcb', 11, 36);
-  bx(44, 1, 100, 0x1f6b35, 0, 0, 0, g);
-  texPlane(44, 100, 12, (c, w, d) => {
-    c.fillStyle = '#1f6b35'; c.fillRect(0, 0, w, d);
-    c.strokeStyle = '#d8b84a'; c.lineWidth = 0.35;
-    const pad = (x, z, r) => { c.fillStyle = '#d8b84a'; c.beginPath(); c.arc(x, z, r, 0, 7); c.fill(); c.fillStyle = '#1f6b35'; c.beginPath(); c.arc(x, z, r * 0.55, 0, 7); c.fill(); c.fillStyle = '#d8b84a'; c.beginPath(); c.arc(x, z, r * 0.3, 0, 7); c.fill(); };
-    pad(w / 2, 55, 4); pad(9, 57, 3); pad(w - 9, 54, 2.6); pad(w - 9, 60, 2.6);
-    for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) pad(9 + k * 13, 67 + r * 8.5, 3);
-    for (let i = 0; i < 8; i++) { c.fillStyle = '#d8b84a'; c.fillRect(w / 2 - 9 + i * 2.5, 44, 1.4, 3); }
-    txt(c, 'AurI-3310 scheda su misura', w / 2, 3, 2, '#cfe8c8'); txt(c, 'sagoma DA MISURARE', w / 2, 6.5, 1.8, '#ffd28a', 0, 'center', false);
-  }, 0, 1.02, 0, g);
-  // sotto la scheda (si vedono esplodendo): modulo, microSD, chip audio
-  bx(18, 3.1, 25.5, 0x1b2b20, 8, -3.1, -22, g); bx(15.8, 2.4, 17.6, 0xb8bcc2, 8, -3.2, -24, g);
-  bx(14, 1.8, 15, 0xc8ccd2, -11, -1.8, -18, g);
-  bx(3, 0.8, 3, 0x111, -12, -0.8, 18, g);
-  bx(4.7, 1, 3.8, 0x999, 6, -1, 44, g);
-  cyl(7.5, 2.5, 0x2b2b2b, -6, -2.5, -40, g, 30);
-  bx(9, 3.2, 7.4, 0xaeb2b8, 0, -3.2, 46.5, g);
-  cyl(6.5, 3.5, 0x151515, 14, -3.5, 10, g, 30);
-  cyl(5, 2.7, 0xb8bcc2, -14, 1, -42, g, 30);
+function lastra(id, base, passo, sopra, sotto, w, l, t, o = {}) {
+  const g = strato(id, base, passo), ts = texF(sopra), tb = texF(sotto);
+  const pz = new THREE.Group(); pz.position.z = o.z || 0; g.add(pz);
+  faccia(pz, ts, o.ws || w, o.ls || l, t, false, o);
+  faccia(pz, tb, w, l, 0, true, o);
+  const n = MOB ? 3 : Math.max(3, Math.round(t / 0.3));
+  for (let i = 1; i < n; i++) faccia(pz, ts, o.ws || w, o.ls || l, t * i / n, false, { ...o, c: 0x3c3c3c, r: 0.9, m: 0 });
+  return g;
+}
+lastra('retro', 0, 0, 'retro_dentro', 'retro_fuori', 50.6, 113, 1.8, { ws: 50.6, ls: 110.7, r: 0.45 });
+const gBat = lastra('bat', 1.8, 16, 'bat_dietro', 'bat_etichetta', 40.5, 55.8, 5, { ws: 41.5, ls: 59, z: 10, r: 0.5, m: 0.2 });
+lastra('telaio', 4.2, 30, 'telaio_sopra', 'telaio_sotto', 42, 113, 3, { ws: 47.6, ls: 113 });
+{ // scheda: sopra il lato tasti (identico all'originale), sotto la NUOVA scheda AurI con i componenti veri
+  const g = lastra('pcb', 7.6, 46, 'pcb_tasti', 'pcb_auri', 46, 109.2, 1, { ws: 45.5, ls: 109.7, r: 0.35, m: 0.25 });
+  const X = x => -(x - 23), Z = y => y - 54.6;     // mm della serigrafia (lato componenti, visto da sotto) -> mondo
+  const metallo = mat(0xc9ced4, { metalness: 0.85, roughness: 0.3 }), nero = mat(0x151515, { roughness: 0.5 });
+  const sotto = (m, y) => { m.rotation.set(Math.PI / 2, 0, Math.PI); m.position.y = y; return m; };
+  // ESP32-S3-WROOM-1: basetta, schermatura metallica con la scritta, antenna PCB verso il bordo alto
+  bx(18, 0.8, 25.5, 0x1d4d2e, X(23.5), -0.8, Z(30), g);
+  bx(15.8, 2.3, 17.6, metallo, X(23.5), -3.1, Z(32.5), g);
+  sotto(texPlane(15.8, 17.6, 24, (c, w, d) => { c.fillStyle = '#c9ced4'; c.fillRect(0, 0, w, d); txt(c, 'ESP32-S3-WROOM-1', w / 2, d / 2 - 2, 1.5, '#333'); txt(c, 'N8R8', w / 2, d / 2 + 1, 1.4, '#333'); txt(c, 'AurI-3310', w / 2, d / 2 + 4, 1.1, '#555', 0, 'center', false); }, X(23.5), 0, Z(32.5), g), -3.12);
+  sotto(texPlane(18, 6, 24, (c, w, d) => { c.fillStyle = '#1d4d2e'; c.fillRect(0, 0, w, d); c.strokeStyle = '#c8a24a'; c.lineWidth = 0.5; c.beginPath(); let x = 2; c.moveTo(x, 1); for (let i = 0; i < 6; i++) { c.lineTo(x, 5); x += 1.2; c.lineTo(x, 5); c.lineTo(x, 1); x += 1.2; c.lineTo(x, 1); } c.stroke(); }, X(23.5), 0, Z(20.2), g), -0.82);
+  // slot microSD a molla: lamiera con nervature
+  bx(14, 1.8, 15, metallo, X(14), -1.8, Z(61), g);
+  for (let i = 0; i < 4; i++) bx(10, 0.15, 0.6, mat(0xa8adb3, { metalness: 0.9, roughness: 0.35 }), X(14), -1.95, Z(61) - 4 + i * 2.4, g);
+  // chip: MAX98357A (QFN 3x3), LDO, microfono MEMS (coperchio metallico col foro)
+  bx(3, 0.8, 3, nero, X(33), -0.8, Z(58), g);
+  bx(3, 1.1, 1.6, nero, X(33), -1.1, Z(66), g);
+  bx(4.7, 1, 3.8, metallo, X(33), -1, Z(98), g); cyl(0.4, 0.06, 0x111, X(33), -1.06, Z(98), g, 12);
+  // USB-C sul bordo basso (dove c'era la presa del caricatore)
+  const usb = new THREE.Mesh(new THREE.CapsuleGeometry(1.6, 5.7, 4, 12), metallo); usb.rotation.z = Math.PI / 2; usb.scale.set(1, 1, 2.3); usb.position.set(X(23.5), -1.7, Z(106.5)); g.add(usb);
+  // cicalino e motorino a moneta ORIGINALI
+  cyl(6.5, 3.2, nero, X(34), -3.2, Z(76), g, 36); cyl(1.2, 0.06, 0x333, X(34), -3.26, Z(76), g, 16);
+  cyl(5, 2.7, metallo, X(12), -2.7, Z(84), g, 36);
+  // passivi 0402/0603 vicino ai chip
+  const cap = mat(0x8a6a44), res = mat(0x111111);
+  for (const [x, y] of [[28, 44], [30, 44], [32, 44], [36, 60], [36, 62], [30, 66], [36, 66], [29, 98], [37, 98], [19, 100], [28, 100], [10, 46], [12, 46], [36, 52], [14, 52]]) bx(1, 0.5, 0.5, (x + y) % 3 ? cap : res, X(x), -0.5, Z(y), g);
   const tag = (id, x, y, z) => { const o = new THREE.Object3D(); o.position.set(x, y, z); o.userData.fin = id; g.add(o); return o; };
-  tag('esp', 8, -4, -22); tag('sd', -11, -2, -18); tag('amp', -6, -3, -40); tag('mic', 6, -1, 44); tag('usb', 0, -3, 46.5); tag('buzz', 14, -3, 10); tag('vibra', -14, 3, -42); tag('pad', 0, 1.2, -6); tag('piste', 0, 1.2, 25);
+  tag('esp', X(23.5), -4, Z(30)); tag('sd', X(14), -2, Z(61)); tag('amp', X(33), -1, Z(58)); tag('mic', X(33), -1, Z(98)); tag('usb', X(23.5), -2, Z(106)); tag('buzz', X(34), -3, Z(76)); tag('vibra', X(12), -3, Z(84)); tag('pad', 0, 1.2, -45); tag('piste', 0, 1.2, 25);
 }
-{ const g = strato('cupole', 12.3, 52); const s = new THREE.Mesh(new THREE.BoxGeometry(42, 0.3, 46), finMat(0xd0d8e0, { transparent: true, opacity: 0.55 })); s.position.set(0, 0.15, 26); g.add(s);
-  const dome = (x, z, r) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), finMat(0xe8eef2, { metalness: 0.8, roughness: 0.25 })); m.scale.y = 0.35; m.position.set(x, 0.3, z); g.add(m); };
-  dome(0, 5, 3.2); dome(-13, 7, 2.6); dome(13, 4, 2.2); dome(13, 10, 2.2);
-  for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) dome(-13 + k * 13, 17 + r * 8.5, 2.6); }
-{ const g = strato('gomma', 13, 68); bx(42, 1.2, 46, 0x30343a, 0, 0, 26, g);
-  const key = (x, z, w, d, t) => { bx(w, 2.4, d, 0xc9ced6, x, 1.2, z, g); };
-  key(0, 5, 14, 6, 'Navi'); key(-13, 7, 8, 5); key(13, 4, 7, 4); key(13, 10, 7, 4);
-  for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) key(-13 + k * 13, 17 + r * 8.5, 10, 6.5); }
-{ const g = strato('lcd', 12.2, 60); bx(40, 3, 36, 0xb8bcc2, 0, 0, -26, g);
-  texPlane(34, 24, 14, (c, w, d) => { c.fillStyle = '#9fb59a'; c.fillRect(0, 0, w, d); txt(c, 'AurI', w / 2, d / 2 - 3, 5, '#1d2a1b'); txt(c, 'display originale', w / 2, d / 2 + 4, 2.2, '#2d3a2b', 0, 'center', false); }, 0, 3.02, -27, g);
-  for (let i = 0; i < 8; i++) bx(1, 1.4, 1.6, 0xd8b84a, -9 + i * 2.5 + 0.7, -1.4, -6.5, g); }
-{ const g = strato('fronte', 22, 88); const sh = new THREE.Mesh(new THREE.BoxGeometry(48, 2, 113), finMat(0x24406e, { transparent: true, opacity: 0.55 })); sh.position.y = 1; g.add(sh);
-  texPlane(48, 113, 6, (c, w, d) => { c.fillStyle = 'rgba(0,0,0,0)'; c.clearRect(0, 0, w, d); c.strokeStyle = '#9fe06a'; c.lineWidth = 0.6; c.strokeRect(7, 16, 34, 26); txt(c, 'AurI', w / 2, 10, 4, '#cfd6e0'); }, 0, 2.05, 0, g).material.transparent = true; }
+{ // lamina a cupole ORIGINALE: foglio trasparente con una cupola d'acciaio su ogni piazzola vera
+  const g = strato('cupole', 8.7, 58);
+  const f = new THREE.Mesh(new THREE.PlaneGeometry(40, 52), new THREE.MeshStandardMaterial({ color: 0xe8eef5, transparent: true, opacity: 0.28, roughness: 0.2 })); f.rotation.x = -Math.PI / 2; f.position.set(0, 0.05, 27); g.add(f);
+  fetch('tex/finito/pezzi.json').then(r => r.json()).then(j => {
+    for (const [x, z, r] of j.tasti) { const m = new THREE.Mesh(new THREE.SphereGeometry(Math.min(r, 3.6) * 0.8, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xdfe5ea, { metalness: 0.9, roughness: 0.18 })); m.scale.y = 0.3; m.position.set(x, 0.05, z); g.add(m); }
+  }).catch(() => {});
+}
+{ // telaio bianco con il display ORIGINALE (vetro con la Home di AurI accesa)
+  const g = lastra('ui', 8.9, 70, 'telaio_ui_sopra', 'telaio_ui_sotto', 46.1, 114.8, 2.6, { ws: 45, ls: 106.6, r: 0.6 });
+  FIN.lcd = g;
+  const v = texPlane(30, 18, 12, (c, w, d) => { c.fillStyle = '#a9c29a'; c.fillRect(0, 0, w, d); txt(c, 'AurI', w / 2, 3, 2.6, '#1d2a1b'); txt(c, '12:00', w / 2, d / 2 + 0.5, 6.5, '#1d2a1b'); txt(c, 'Menu', w / 2, d - 2.6, 2.4, '#1d2a1b'); }, 0, 2.63, -21, g);
+  v.material.emissive = new THREE.Color(0x2a3624);
+}
+lastra('gomma', 11.6, 84, 'gomma_sopra', 'gomma_sotto', 47.6, 50.8, 2.4, { ws: 40.9, ls: 42.8, z: 30, r: 0.35, m: 0.35 });
+lastra('fronte', 14.2, 100, 'fronte_fuori', 'fronte_dentro', 49, 110.8, 2, { ws: 49.5, ls: 111.9, r: 0.3 });
+// luce da sotto: la vista Retro (e la scheda vista da sotto) non resta al buio
+{ const l = new THREE.DirectionalLight(0xffffff, 1.1); l.position.set(60, -200, 80); gFin.add(l); gFin.add(new THREE.AmbientLight(0xffffff, 0.35)); }
+// batteria: si puo' togliere (il telefono va anche col caricatore originale o la USB-C)
+{
+  const lab = document.getElementById('eslab');
+  if (lab) {
+    const b = document.createElement('label'); b.id = 'batlab'; b.innerHTML = '<input type="checkbox" id="batOn" checked> batteria'; lab.after(b);
+    b.querySelector('input').addEventListener('change', e => { gBat.visible = e.target.checked; if (P3) P3.setVisible('Batteria', e.target.checked); });
+  }
+}
 // etichette cliccabili sopra ogni pezzo
-const LAB_FIN = [['retro', 0, 14, 50], ['bat', -25, 12, -8], ['pcb', 26, 2, 30], ['esp', 22, -2, -22], ['sd', -26, -2, -18], ['amp', -26, -3, -40], ['mic', 22, -1, 44], ['usb', 0, -6, 58], ['buzz', 28, -3, 10], ['vibra', -28, 3, -42], ['pad', 26, 3, -6], ['piste', -28, 3, 30], ['cupole', 28, 2, 26], ['gomma', -28, 3, 20], ['lcd', 28, 4, -26], ['fronte', 0, 5, -62]];
+const LAB_FIN = [['retro', 0, 2, 64], ['bat', -30, 4, 0], ['telaio', 30, 2, -40], ['pcb', 30, 1, 40], ['esp', 22, -4, -24], ['sd', -24, -2, 6], ['amp', -26, -1, 2], ['mic', -26, -1, 44], ['usb', 0, -4, 62], ['buzz', -28, -3, 22], ['vibra', 26, -3, 30], ['pad', 26, 2, -50], ['piste', -28, 2, 30], ['cupole', 28, 1, 26], ['ui', -30, 3, -10], ['lcd', 28, 4, -26], ['gomma', -30, 3, 0], ['fronte', 0, 3, -64]];
 const finLabels = [];
 for (const [id, x, y, z] of LAB_FIN) {
   const par = ['esp', 'sd', 'amp', 'mic', 'usb', 'buzz', 'vibra', 'pad', 'piste'].includes(id) ? FIN.pcb : FIN[id];
-  const l = etichetta(FIN_INFO[id][0].replace(/ \(.*|ORIGINALE /g, ''), '#9fe06a'); l.scale.set(26, 4.9, 1); l.position.set(x, y + 4, z); l.userData.fin = id; par.add(l); finLabels.push(l);
+  if (!par) continue;
+  const l = etichetta(FIN_INFO[id][0].replace(/ \(.*/g, ''), FIN_INFO[id][0].startsWith('NUOVO') ? '#9fe06a' : '#ffd28a'); l.scale.set(26, 4.9, 1); l.position.set(x, y + 4, z); l.userData.fin = id; par.add(l); finLabels.push(l);
 }
-function esplodi(e) { for (const g of Object.values(FIN)) g.position.y = g.userData.base + e * g.userData.passo; }
+function esplodi(e) {
+  if (P3) P3.setExplode(e);
+  for (const g of Object.values(FIN)) g.position.y = g.userData.base + e * g.userData.passo;
+  // telefono chiuso: le etichette dei pezzi nascosti dentro confondono, si vedono solo aprendolo
+  if (typeof finLabels !== 'undefined') for (const l of finLabels) l.visible = e > 0.15 || ['fronte', 'retro'].includes(l.userData.fin);
+}
 function infoFin(id) {
   const k = FIN_INFO[id], el = document.getElementById('info'); if (!k) return; el.style.display = 'block';
   el.innerHTML = `<b>${k[0]}</b><p>Misure: ${k[1]}</p><p>Come si monta: ${k[2]}</p>`;
 }
 let VISTA = 'banco';
+// ---- Telefono finito = lo stesso telefono 3D curato del simulatore (phone3d.js), con la scheda NUOVA di AurI.
+// Display: i pixel veri del telefono acceso nell'iframe, ridisegnati nitidi (84x48 -> 504x288).
+let P3 = null, p3Load = null;
+// tutti i pezzi visibili (dopo "Scheda AurI" che mostra solo la scheda); la batteria segue la casella
+const tutti = () => { if (!P3) return; for (const n of ['Coperchio', 'Batteria', 'Chassis', 'Viti Torx', 'Display', 'Tastierino', 'Cover frontale']) P3.setVisible(n, true); P3.setVisible('Batteria', document.getElementById('batOn') ? document.getElementById('batOn').checked : true); };
+const finEl = document.createElement('div'); finEl.id = 'fin3d'; document.body.appendChild(finEl);
+const lcdCv = document.createElement('canvas'); lcdCv.width = 84 * 6; lcdCv.height = 48 * 6;
+const lcdG = lcdCv.getContext('2d');
+function lcdAggiorna() {
+  let t = null, lit = true;
+  try { const w = document.getElementById('telframe').contentWindow; t = w.auriPixel(); lit = w.auriAcceso(); } catch (e) {}
+  const bg = lit ? [157, 200, 106] : [126, 140, 110], fg = lit ? [28, 43, 20] : [34, 42, 30];
+  const gr = lcdG.createRadialGradient(252, 160, 30, 252, 160, 330);
+  gr.addColorStop(0, `rgb(${bg.map(c => Math.min(255, c + 12))})`); gr.addColorStop(1, `rgb(${bg.map(c => c - 18)})`);
+  lcdG.fillStyle = gr; lcdG.fillRect(0, 0, 504, 288);
+  if (!t) return;
+  const sh = document.getElementById('telframe').contentWindow.auriGuasto?.schermo;
+  if (sh === 'spento') { lcdG.fillStyle = '#1b2016'; lcdG.fillRect(0, 0, 504, 288); return; }
+  if (sh === 'vuoto') return;
+  lcdG.fillStyle = 'rgba(0,0,0,0.12)'; lcdG.beginPath();
+  for (let i = 0; i < 84 * 48; i++) if (t[i] || (sh === 'caos' && Math.random() < 0.33)) lcdG.rect((i % 84) * 6 + 1.6, ((i / 84) | 0) * 6 + 1.6, 5.2, 5.2);
+  lcdG.fill();
+  lcdG.fillStyle = `rgb(${fg})`; lcdG.beginPath();
+  for (let i = 0; i < 84 * 48; i++) if (t[i] || (sh === 'caos' && Math.random() < 0.33)) lcdG.rect((i % 84) * 6, ((i / 84) | 0) * 6, 5.2, 5.2);
+  lcdG.fill();
+}
+const FIN_NOME = { 'Coperchio': 'retro', 'Batteria': 'bat', 'Chassis': 'telaio', 'Scheda (PCB)': 'pcb', 'Display': 'lcd', 'Tastierino': 'gomma', 'Cover frontale': 'fronte', 'Viti Torx': 'viti' };
+FIN_INFO.viti = ['ORIGINALE · Viti Torx T6', '6 viti lunghe ~7 mm', 'Le stesse di prima: tengono la scheda nuova sullo chassis, negli stessi fori.'];
+FIN_INFO.ldo = ['NUOVO · Regolatore 3,3 V (LDO)', 'SOT-23-5, 2,9 x 1,6 mm', 'Montato dalla fabbrica: dai 5 V della USB-C (o dal caricatore) fa i 3,3 V per ESP32, display e microSD.'];
+async function finito3d(on) {
+  finEl.style.display = on ? 'block' : 'none';
+  renderer.domElement.style.visibility = on ? 'hidden' : 'visible';
+  if (!on) { if (P3) P3.show(false); return; }
+  tutti();
+  if (!p3Load) p3Load = import('./phone3d.js').then(({ createPhone3D }) => {
+    const tw = () => document.getElementById('telframe').contentWindow;
+    P3 = createPhone3D(finEl, {
+      press: k => { try { tw().auriPress(k); } catch (e) {} }, release: k => { try { tw().auriRelease(k); } catch (e) {} },
+      lcdCanvas: lcdCv, noMap: true, auri: true,
+      onPick: (nome, info) => { const id = info || FIN_NOME[nome]; if (id) { infoFin(id); if (window.UI) UI.apri('info'); } },
+    });
+    setInterval(() => { if (VISTA !== 'banco') lcdAggiorna(); }, 80);
+    lcdAggiorna();
+    return P3;
+  });
+  await p3Load;
+  P3.show(true);
+  P3.setExplode(+document.getElementById('esplodi').value);
+  P3.setVisible('Batteria', document.getElementById('batOn') ? document.getElementById('batOn').checked : true);
+}
 function vista(v) {
   VISTA = v;
   const banco = v === 'banco';
   for (const [k, g] of Object.entries(groups)) g.visible = banco && (document.querySelector(`#toggles input[data-k="${k}"]`)?.checked ?? true);
   gSald.visible = banco && document.getElementById('saldOn').checked;
   if (banco) { variante(VARIANTE); } else conns.forEach(c => { if (c.mesh) c.mesh.visible = false; });
-  gFin.visible = !banco;
+  gFin.visible = false;
+  finito3d(!banco);
   document.querySelectorAll('#viste button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   document.body.classList.toggle('finito', !banco);
   controls.maxPolarAngle = Math.PI * 0.49;
-  if (banco) flyTo(V(0, 0, 0), MOB ? 560 : 370); else { esplodi(+document.getElementById('esplodi').value); flyTo(V(0, 40, 0), MOB ? 380 : 260); }
+  if (banco) flyTo(V(0, 0, 0), MOB ? 560 : 370); else esplodi(+document.getElementById('esplodi').value);
   if (window.UI) UI.chips();
 }
 document.querySelectorAll('#viste button').forEach(b => b.addEventListener('click', () => vista(b.dataset.v)));
 document.getElementById('esplodi').addEventListener('input', e => esplodi(+e.target.value));
-esplodi(0.5);
+esplodi(0);
 
 // ---------- interfaccia per il telefono: foglio dal basso, bolla del telefono, chip di inquadratura ----------
 const UI = (() => {
@@ -962,10 +1051,12 @@ const UI = (() => {
     ['Corrente', () => vai([groups.alim])],
   ];
   const CHIP_FIN = [
-    ['Fronte', () => { controls.maxPolarAngle = Math.PI * 0.49; esplodi(0); document.getElementById('esplodi').value = 0; flyTo(V(0, 10, 0), MOB ? 300 : 200, V(0, 1, 0.35)); }],
-    ['Esploso', () => { controls.maxPolarAngle = Math.PI * 0.49; esplodi(1); document.getElementById('esplodi').value = 1; flyTo(V(0, 50, 0), MOB ? 420 : 300, V(0.6, 0.7, 0.8)); }],
-    ['Metà', () => { controls.maxPolarAngle = Math.PI * 0.49; esplodi(0.5); document.getElementById('esplodi').value = 0.5; flyTo(V(0, 40, 0), MOB ? 380 : 260); }],
-    ['Retro', () => { controls.maxPolarAngle = Math.PI; esplodi(0); document.getElementById('esplodi').value = 0; flyTo(V(0, 0, 0), MOB ? 300 : 200, V(0, -1, 0.35)); }],
+    ['Fronte', () => { tutti(); esplodi(0); document.getElementById('esplodi').value = 0; P3 && P3.view('fronte'); }],
+    ['Esploso', () => { tutti(); esplodi(1); document.getElementById('esplodi').value = 1; P3 && P3.view('tre4'); }],
+    ['Metà', () => { tutti(); esplodi(0.5); document.getElementById('esplodi').value = 0.5; P3 && P3.view('tre4'); }],
+    ['Retro', () => { tutti(); esplodi(0); document.getElementById('esplodi').value = 0; P3 && P3.view('retro'); }],
+    ['Scheda AurI', () => { if (!P3) return; for (const n of ['Coperchio', 'Batteria', 'Chassis', 'Viti Torx', 'Display', 'Tastierino', 'Cover frontale']) P3.setVisible(n, false); esplodi(0); document.getElementById('esplodi').value = 0; P3.view('dietro34'); }],
+    ['Lato tasti', () => { if (!P3) return; for (const n of ['Coperchio', 'Batteria', 'Chassis', 'Viti Torx', 'Display', 'Tastierino', 'Cover frontale']) P3.setVisible(n, false); esplodi(0); document.getElementById('esplodi').value = 0; P3.view('tre4'); }],
   ];
   function chips() {
     const lista = VISTA === 'banco' ? CHIP_BANCO : CHIP_FIN;
@@ -988,4 +1079,4 @@ window.UI = UI;
 
 // per le prove automatiche
 const prova = { stacca: i => { conns[i].guasto = { stacca: true }; ridisegna(conns[i]); aggiorna(); }, sposta: (i, p) => { conns[i].guasto = { pin: p }; ridisegna(conns[i]); aggiorna(); }, variante, statoTel, valuta, effetto, vista, esplodi };
-window.banco = { conns, groups, select, flyTo, camera, controls, prova, ui: UI, pronto: true };
+window.banco = { conns, groups, select, flyTo, camera, controls, prova, ui: UI, pronto: true, p3: () => P3 };

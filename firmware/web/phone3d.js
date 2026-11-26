@@ -65,7 +65,9 @@ const smooth = (pts, n = 240, win = 4, passes = 3) => {
 // contorno rimpicciolito di d mm per lato (abbastanza preciso per profili convessi)
 const inset = (pts, d, P) => { const b = bbox(pts); return toPath(pts, (b.w - 2 * d) / b.w, (b.h - 2 * d) / b.h, b.cx, b.cy, P); };
 
-export function createPhone3D(container, { press, release }) {
+// opzioni per il banco ESP32 (banco3d.html): lcdCanvas = display da mostrare, noMap = senza mappa,
+// auri = scheda NUOVA di AurI al posto del lato componenti originale, onPick(nome, info) al tocco di un pezzo.
+export function createPhone3D(container, { press, release, lcdCanvas = null, noMap = false, auri = false, onPick = null }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -297,13 +299,14 @@ export function createPhone3D(container, { press, release }) {
     // PCB verde 2 mm, a filo nel vano frontale dello chassis.
     const pcb = layer(13, 6, 'Scheda (PCB)'), pg = new THREE.Group(); pcb.add(pg);
     slab(pg, P.pcb, 'pcb', 2, 0x2c4a2e, { roughness: 0.45, metalness: 0.15 });
+    if (auri) schedaAuri(pg, P.pcb);
     center(pg, P.pcb);
 
     // Display 2 mm: telaio UI che lo regge e modulo LCD vivo.
     const ui = layer(15, 17, 'Display'), ug = new THREE.Group(); ui.add(ug);
     slab(ug, P.ui_frame, 'ui_frame', 1, 0xe8e8e8, { roughness: 0.55 });
     center(ug, P.ui_frame);
-    lcdTex = new THREE.CanvasTexture(document.getElementById('lcd'));
+    lcdTex = new THREE.CanvasTexture(lcdCanvas || document.getElementById('lcd'));
     lcdTex.colorSpace = THREE.SRGBColorSpace;
     const lw = CW * 0.6846, lh = CH * 0.2101, lx = -CW / 2 + CW * (0.1524 + 0.6846 / 2), ly = CH / 2 - CH * (0.2601 + 0.2101 / 2);
     // modulo LCD tutto sotto la faccia della cover (che sta a 17): cornice scura e vetro a 16,6
@@ -411,6 +414,127 @@ export function createPhone3D(container, { press, release }) {
     applyExplode(); invalidate();
   }
 
+  // ---- Scheda NUOVA di AurI (lato componenti, verso lo chassis): stessa sagoma dell'originale, lato tasti identico.
+  // Maschera verde lucida, bordo dorato, piste, vie, serigrafia e componenti veri in scala (mm).
+  function schedaAuri(pg, PP) {
+    const W = PP.w, H = PP.h, S = 22, cw = Math.round(W * S), ch = Math.round(H * S);
+    const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    const c = cv.getContext('2d');
+    // mm (vista da davanti) -> pixel della texture del lato dietro (specchiata)
+    const X = x => (0.5 - x / W) * cw, Y = y => (0.5 - y / H) * ch, M = v => v * S;
+    const gr = c.createLinearGradient(0, 0, cw, ch); gr.addColorStop(0, '#0f5c30'); gr.addColorStop(1, '#0a4826');
+    c.fillStyle = gr; c.fillRect(0, 0, cw, ch);
+    for (let i = 0; i < 2600; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * 0.025})`; c.fillRect(Math.random() * cw, Math.random() * ch, 2, 2); }
+    // piste di rame sotto la maschera (verde piu' chiaro), ortogonali e a 45 gradi
+    const pista = (pts, w = 0.25) => { c.strokeStyle = '#1f8a48'; c.lineWidth = M(w); c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(X(x), Y(y)) : c.moveTo(X(x), Y(y))); c.stroke(); };
+    const via = (x, y) => { c.fillStyle = '#d9b45a'; c.beginPath(); c.arc(X(x), Y(y), M(0.35), 0, 7); c.fill(); c.fillStyle = '#2a2a1a'; c.beginPath(); c.arc(X(x), Y(y), M(0.15), 0, 7); c.fill(); };
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 46; k++) {
+      let x = -16 + rnd() * 32, y = -46 + rnd() * 88; const pts = [[x, y]];
+      for (let j = 0; j < 3; j++) { const d = rnd() * 9 + 2, a = Math.floor(rnd() * 8) * Math.PI / 4; x = Math.max(-19, Math.min(19, x + Math.cos(a) * d)); y = Math.max(-50, Math.min(48, y + Math.sin(a) * d)); pts.push([x, y]); }
+      pista(pts, 0.18 + rnd() * 0.22); via(...pts[pts.length - 1]); if (k % 3 === 0) via(...pts[0]);
+    }
+    for (let i = 0; i < 8; i++) pista([[-6 + i * 1.2, 34], [-6 + i * 1.2, 44], [-9 + i * 1.2, 50]], 0.2);
+    for (let i = 0; i < 8; i++) pista([[14, 10 - i * 1.3], [4, 10 - i * 1.3], [-2, 4 - i * 1.3], [-2, -30 - i * 0.4]], 0.18);
+    // fori di fissaggio dorati, dove passano le viti originali
+    for (const [x, y] of [[-17.5, 47], [17.5, 47], [-18, -24], [18, -24], [-15, -50], [15, -50]]) {
+      c.fillStyle = '#e2bf62'; c.beginPath(); c.arc(X(x), Y(y), M(2), 0, 7); c.fill();
+      c.fillStyle = '#0d0d0d'; c.beginPath(); c.arc(X(x), Y(y), M(1.05), 0, 7); c.fill();
+    }
+    // serigrafia bianca (scritta a specchio rispetto ai mm: si legge guardando il retro della scheda)
+    const silk = (t, x, y, sz = 1.4) => { c.fillStyle = '#f2f2ea'; c.font = `600 ${M(sz)}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(t, X(x), Y(y)); };
+    const sbox = (x, y, w, h) => { c.strokeStyle = '#f2f2ea'; c.lineWidth = M(0.15); c.strokeRect(X(x) - M(w) / 2, Y(y) - M(h) / 2, M(w), M(h)); };
+    silk('AurI-3310', 0, -38.5, 3.2); silk('rev A · 2026', 0, -42.3, 1.5);
+    sbox(3.5, 30, 18.8, 26.3); silk('U1', 3.5 + 11, 30, 1.3);
+    sbox(-9, 4, 14.8, 15.8); silk('J2 microSD', -9, -5.4, 1.2);
+    sbox(12, 6, 3.8, 3.8); silk('U2', 12, 9, 1.1); sbox(12, -2, 3.6, 2.4); silk('U3', 12, -4.2, 1.1);
+    silk('BZ1', -10, -34, 1.2); silk('M1', 10, -35, 1.2); silk('MK1', -4, -44.2, 1.1); silk('J1 USB-C', 7, -48.5, 1.2);
+    // contorno dorato (bordo ENIG) lungo la sagoma vera
+    c.strokeStyle = '#e2bf62'; c.lineWidth = M(1.1); c.beginPath();
+    for (let i = 0; i < PP.outline.length; i += 2) { const px = X(PP.outline[i]), py = Y(PP.outline[i + 1]); i ? c.lineTo(px, py) : c.moveTo(px, py); }
+    c.closePath(); c.stroke();
+    const tex2 = new THREE.CanvasTexture(cv); tex2.colorSpace = THREE.SRGBColorSpace; tex2.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex2.repeat.set(-1 / W, 1 / H); tex2.offset.set(0.5, 0.5);
+    const back = pg.children[pg.children.length - 1];
+    back.material = new THREE.MeshPhysicalMaterial({ map: tex2, roughness: 0.32, metalness: 0.05, clearcoat: 0.8, clearcoatRoughness: 0.18, envMapIntensity: 0.6, side: THREE.BackSide, polygonOffset: true, polygonOffsetFactor: -2 });
+
+    // ---- componenti sul lato dietro (z negativo: la scheda va da z=0 a z=2) ----
+    const comp = new THREE.Group(); pg.add(comp);
+    const steel = new THREE.MeshPhysicalMaterial({ color: 0xe4e8ec, metalness: 0.7, roughness: 0.28, envMapIntensity: 2.2, clearcoat: 0.4 });
+    const steelS = new THREE.MeshPhysicalMaterial({ color: 0xd0d5da, metalness: 0.65, roughness: 0.4, envMapIntensity: 2 });
+    const gold = new THREE.MeshPhysicalMaterial({ color: 0xf0cc70, metalness: 0.75, roughness: 0.28, envMapIntensity: 2 });
+    const black = new THREE.MeshPhysicalMaterial({ color: 0x141416, roughness: 0.45, clearcoat: 0.3 });
+    const blk2 = new THREE.MeshStandardMaterial({ color: 0x1c1c1f, roughness: 0.7 });
+    const info = (o, k) => { o.userData.info = k; return o; };
+    const bxm = (w, h, d, m, x, y, z = 0, par = comp) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z - d / 2 - 0.01); o.castShadow = o.receiveShadow = true; par.add(o); meshes.push(o); return o; };
+    const lbl = (txts, w, h, x, y, z, col = '#2b2f33') => {
+      const k = 40, cv2 = document.createElement('canvas'); cv2.width = w * k; cv2.height = h * k; const g = cv2.getContext('2d');
+      g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle';
+      txts.forEach(([t, sz, dy, wt]) => { g.font = `${wt || 600} ${sz * k}px system-ui, sans-serif`; g.fillText(t, cv2.width / 2, cv2.height / 2 + dy * k); });
+      const t = new THREE.CanvasTexture(cv2); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+      m.rotation.y = Math.PI; m.position.set(x, y, z - 0.03); comp.add(m); return m;
+    };
+    // ESP32-S3-WROOM-1: basetta con antenna stampata verso il bordo alto, schermatura lucida, piazzole dorate
+    const ex = 3.5, ey = 30;
+    const mod = info(new THREE.Group(), 'esp'); comp.add(mod);
+    bxm(18, 25.5, 0.8, new THREE.MeshPhysicalMaterial({ color: 0x0f3a24, roughness: 0.35, clearcoat: 0.6 }), ex, ey, 0, mod);
+    const ant = document.createElement('canvas'); ant.width = 360; ant.height = 120;
+    { const g = ant.getContext('2d'); g.fillStyle = '#0f3a24'; g.fillRect(0, 0, 360, 120); g.strokeStyle = '#d9b45a'; g.lineWidth = 9; g.beginPath(); let x = 30; g.moveTo(x, 100); for (let i = 0; i < 6; i++) { g.lineTo(x, 22); x += 24; g.lineTo(x, 22); g.lineTo(x, 100); x += 24; g.lineTo(x, 100); } g.stroke(); }
+    const at = new THREE.CanvasTexture(ant); at.colorSpace = THREE.SRGBColorSpace;
+    const antM = new THREE.Mesh(new THREE.PlaneGeometry(18, 6), new THREE.MeshStandardMaterial({ map: at, roughness: 0.4 })); antM.rotation.y = Math.PI; antM.position.set(ex, ey + 9.6, -0.83); mod.add(antM);
+    bxm(15.8, 17.6, 2.3, steel, ex, ey - 3.2, -0.8, mod);
+    lbl([['ESP32-S3-WROOM-1', 1.35, -3.2, 700], ['N8R8', 1.2, -1.2], ['AurI · 8 MB', 1, 1.2, 500]], 15, 15, ex, ey - 3.2, -3.1);
+    for (let i = 0; i < 13; i++) for (const sx of [-1, 1]) bxm(0.9, 0.7, 0.3, gold, ex + sx * 9.1, ey - 11.5 + i * 1.27, 0, mod);
+    // slot microSD a molla: lamiera con nervature e scritta stampata
+    const sd = info(new THREE.Group(), 'sd'); comp.add(sd);
+    bxm(14, 15, 1.8, steelS, -9, 4, 0, sd);
+    for (let i = 0; i < 3; i++) bxm(10, 0.6, 0.12, steel, -9, i * 3, -1.8, sd);
+    bxm(11, 2.5, 1.5, blk2, -9, -4.6, 0, sd);
+    lbl([['PUSH', 1.2, 0, 700]], 8, 2.5, -9, 9, -1.95, '#555b62');
+    // MAX98357A (QFN 3x3) con piedini, LDO SOT-23-5, condensatori grossi
+    const amp = info(new THREE.Group(), 'amp'); comp.add(amp);
+    bxm(3, 3, 0.8, black, 12, 6, 0, amp);
+    for (let i = 0; i < 4; i++) for (const s2 of [-1, 1]) { bxm(0.3, 0.5, 0.2, steel, 12 + s2 * 1.6, 4.8 + i * 0.8, 0, amp); bxm(0.5, 0.3, 0.2, steel, 10.8 + i * 0.8, 6 + s2 * 1.6, 0, amp); }
+    const ldo = info(new THREE.Group(), 'ldo'); comp.add(ldo);
+    bxm(2.9, 1.6, 1.1, black, 12, -2, 0, ldo);
+    for (let i = 0; i < 3; i++) bxm(0.4, 0.7, 0.25, steel, 11 + i * 0.95, -3.1, 0, ldo);
+    for (let i = 0; i < 2; i++) bxm(0.4, 0.7, 0.25, steel, 11.5 + i * 1.9, -0.9, 0, ldo);
+    const cerB = new THREE.MeshStandardMaterial({ color: 0xc9a46a, roughness: 0.55 });
+    for (const [x, y] of [[15.5, -2], [15.5, 2], [8.5, -6]]) { bxm(2, 1.25, 1.2, cerB, x, y, 0); bxm(0.35, 1.25, 1.22, steel, x - 0.85, y, 0); bxm(0.35, 1.25, 1.22, steel, x + 0.85, y, 0); }
+    // passivi 0402: ceramici beige e resistenze nere, con terminali stagnati
+    const cer = new THREE.MeshStandardMaterial({ color: 0xb08a5c, roughness: 0.6 });
+    let sd2 = 3; const r2 = () => (sd2 = (sd2 * 48271) % 2147483647) / 2147483647;
+    for (let i = 0; i < 60; i++) {
+      const x = -16 + r2() * 32, y = -40 + r2() * 72, rot = r2() > 0.5, m = r2() > 0.45 ? cer : black;
+      if (Math.abs(x - ex) < 10.5 && y > 16) continue;
+      if (x < -1 && x > -17 && y > -5 && y < 13) continue;
+      if (Math.hypot(x + 10, y + 26) < 7.5 || Math.hypot(x - 10, y + 28) < 6) continue;
+      const g = new THREE.Group(); g.position.set(x, y, 0); if (rot) g.rotation.z = Math.PI / 2; comp.add(g);
+      bxm(0.6, 0.5, 0.35, m, 0, 0, 0, g); bxm(0.2, 0.5, 0.36, steel, -0.4, 0, 0, g); bxm(0.2, 0.5, 0.36, steel, 0.4, 0, 0, g);
+    }
+    // cicalino e motorino ORIGINALI riusati
+    const buzz = info(new THREE.Group(), 'buzz'); comp.add(buzz);
+    const bz = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 3, 48).rotateX(Math.PI / 2), black); bz.position.set(-10, -26, -1.5); buzz.add(bz); meshes.push(bz);
+    const bzh = new THREE.Mesh(new THREE.CircleGeometry(1.2, 24), new THREE.MeshBasicMaterial({ color: 0x050505 })); bzh.rotation.y = Math.PI; bzh.position.set(-10, -26, -3.02); buzz.add(bzh);
+    const vib = info(new THREE.Group(), 'vibra'); comp.add(vib);
+    const vb = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 2.7, 48).rotateX(Math.PI / 2), steel); vb.position.set(10, -28, -1.35); vib.add(vb); meshes.push(vb);
+    lbl([['VIBRA', 1.2, 0, 700]], 7, 2, 10, -28, -2.72, '#6a7078');
+    // microfono MEMS: coperchio metallico col foro, vicino al foro del microfono in basso
+    const mic = info(new THREE.Group(), 'mic'); comp.add(mic);
+    bxm(4.72, 3.76, 1, steel, -4, -47, 0, mic);
+    const mh = new THREE.Mesh(new THREE.CircleGeometry(0.4, 20), new THREE.MeshBasicMaterial({ color: 0x050505 })); mh.rotation.y = Math.PI; mh.position.set(-4, -47, -1.04); mic.add(mh);
+    // USB-C sul bordo basso, bocca verso il basso (dove c'era la presa del caricatore)
+    const usb = info(new THREE.Group(), 'usb'); comp.add(usb);
+    const rr = new THREE.Shape(), uw = 8.94, uh = 3.26, ur = 1.6;
+    rr.moveTo(-uw / 2 + ur, -uh / 2); rr.lineTo(uw / 2 - ur, -uh / 2); rr.absarc(uw / 2 - ur, 0, ur, -Math.PI / 2, Math.PI / 2); rr.lineTo(-uw / 2 + ur, uh / 2); rr.absarc(-uw / 2 + ur, 0, ur, Math.PI / 2, Math.PI * 1.5);
+    const ugeo = new THREE.ExtrudeGeometry(rr, { depth: 7.35, bevelEnabled: false, curveSegments: 16 }); ugeo.rotateX(Math.PI / 2);
+    const yb = bbox(PP.outline).y0;
+    const um = new THREE.Mesh(ugeo, steel); um.position.set(0, yb + 6.6, -uh / 2 - 0.05); usb.add(um); meshes.push(um);
+    const mouth = new THREE.Mesh(new THREE.PlaneGeometry(uw - 0.7, uh - 0.6), new THREE.MeshBasicMaterial({ color: 0x0a0a0a })); mouth.rotation.x = Math.PI / 2; mouth.position.set(0, yb - 0.76, -uh / 2 - 0.05); usb.add(mouth);
+    const tongue = new THREE.Mesh(new THREE.BoxGeometry(6.6, 3, 0.7), black); tongue.position.set(0, yb + 0.9, -uh / 2 - 0.05); usb.add(tongue);
+  }
+
   // posizione = livello nella pila + smontaggio + spostamento a mano del singolo pezzo
   const applyExplode = () => { for (const g of layers) g.position.set(0, 0, g.userData.z + g.userData.spread * explode).add(g.userData.off); };
 
@@ -418,7 +542,12 @@ export function createPhone3D(container, { press, release }) {
   const phoneEl = document.getElementById('phone'), stageEl = document.getElementById('stage');
   let placed = false;
   function resize() {
-    const r = phoneEl.getBoundingClientRect(), s = stageEl.getBoundingClientRect();
+    let r, s;
+    if (phoneEl && stageEl && !lcdCanvas) { r = phoneEl.getBoundingClientRect(); s = stageEl.getBoundingClientRect(); }
+    else {   // nel banco: il telefono riempie l'80% dello spazio del contenitore
+      s = container.getBoundingClientRect();
+      r = { width: 1, height: Math.min(s.height * (s.width < 600 ? 0.66 : 0.78), s.width * (s.width < 600 ? 0.62 : 0.8) * CH / CW) };
+    }
     if (!r.width || !s.width) return;
     const w = s.width, h = s.height;
     renderer.setSize(w, h);
@@ -434,7 +563,7 @@ export function createPhone3D(container, { press, release }) {
     invalidate();
   }
   addEventListener('resize', resize);
-  new ResizeObserver(resize).observe(stageEl);
+  new ResizeObserver(resize).observe(lcdCanvas || !stageEl ? container : stageEl);
   controls.addEventListener('change', invalidate);
 
   function loop(now) {
@@ -473,7 +602,7 @@ export function createPhone3D(container, { press, release }) {
   requestAnimationFrame(loop);
 
   // direzione della camera e vettore "su" per ogni vista
-  const VIEWS = { fronte: [[0, 0, 1], [0, 1, 0]], retro: [[0, 0, -1], [0, 1, 0]], destra: [[1, 0, 0], [0, 1, 0]], sinistra: [[-1, 0, 0], [0, 1, 0]], alto: [[0, 1, 0], [0, 0, -1]], sotto: [[0, -1, 0], [0, 0, 1]] };
+  const VIEWS = { fronte: [[0, 0, 1], [0, 1, 0]], retro: [[0, 0, -1], [0, 1, 0]], destra: [[1, 0, 0], [0, 1, 0]], sinistra: [[-1, 0, 0], [0, 1, 0]], alto: [[0, 1, 0], [0, 0, -1]], sotto: [[0, -1, 0], [0, 0, 1]], tre4: [[0.62, 0.32, 0.72], [0, 1, 0]], dietro34: [[-0.55, 0.3, -0.78], [0, 1, 0]] };
   function view(name) {
     const [dir, up] = VIEWS[name];
     const m = new THREE.Matrix4().lookAt(new THREE.Vector3(...dir), new THREE.Vector3(), new THREE.Vector3(...up));
@@ -504,11 +633,12 @@ export function createPhone3D(container, { press, release }) {
   map.width = map.height = 132 * 2;
   Object.assign(map.style, { position: 'absolute', right: '12px', top: '12px', width: '132px', height: '132px', borderRadius: '12px', background: 'rgba(12,15,22,.78)', border: '1px solid rgba(255,255,255,.12)', touchAction: 'none', zIndex: 3 });
   container.appendChild(map);
+  if (noMap) map.style.display = 'none';
   const mctx = map.getContext('2d');
   let mapView = null;
   const tmpBox = new THREE.Box3();
   function drawMap() {
-    if (!layers.length) return;
+    if (noMap || !layers.length) return;
     const boxes2 = layers.filter(g => g.visible).map(g => ({ g, b: tmpBox.setFromObject(g).clone() }));
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const { b } of boxes2) { x0 = Math.min(x0, b.min.x); x1 = Math.max(x1, b.max.x); z0 = Math.min(z0, b.min.z); z1 = Math.max(z1, b.max.z); }
@@ -566,7 +696,7 @@ export function createPhone3D(container, { press, release }) {
   const setPtr = e => { const r = renderer.domElement.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ptr, camera); };
   const hitPart = e => {
     setPtr(e);
-    for (const h of ray.intersectObjects(meshes, false)) { const g = partOf(h.object); if (g && g.visible) return { g, point: h.point }; }
+    for (const h of ray.intersectObjects(meshes, false)) { const g = partOf(h.object); if (g && g.visible) return { g, point: h.point, obj: h.object }; }
     return null;
   };
   const Q0 = new THREE.Quaternion();
@@ -705,7 +835,7 @@ export function createPhone3D(container, { press, release }) {
       }
     }
     const h = hitPart(e);
-    grab = { x: e.clientX, y: e.clientY, t: performance.now(), g: h && h.g, point: h && h.point, mode: null, moved: false };
+    grab = { x: e.clientX, y: e.clientY, t: performance.now(), g: h && h.g, point: h && h.point, obj: h && h.obj, mode: null, moved: false };
     if (!h) return;
     const free = explode > 0.01 || displaced(h.g);
     if (free) {
@@ -727,6 +857,7 @@ export function createPhone3D(container, { press, release }) {
     if (!grab) return;
     clearTimeout(grab.timer);
     const g = grab.g, wasTap = !grab.moved && !grab.mode && performance.now() - grab.t < 300;
+    if (wasTap && g && onPick) { let o = grab.obj; while (o && !o.userData.info && o !== g) o = o.parent; onPick(g.userData.name, o && o.userData.info); }
     controls.enabled = true;
     grab = null;
     if (!wasTap) return;
@@ -799,6 +930,8 @@ export function createPhone3D(container, { press, release }) {
       return out;
     },
     reassemble,
+    setVisible(name, on) { const g = layers.find(l => l.userData.name === name); if (g) { g.visible = on; invalidate(); } },
+    invalidate,
     get loading() { return pending > 0; },
     ready,
   };
