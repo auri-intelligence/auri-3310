@@ -24,6 +24,9 @@ I2C_SCL = 2
 
 # Bench placeholders until the H0 prototype: to be checked on the real wiring.
 POWER_KEY = 0        # BOOT button of the DevKitC, active low; also the deep-sleep wake pin
+# Banco senza batteria (USB-C o caricatore originale): GPIO 3 e 21 restano scollegati e non si leggono
+# (pin flottanti = percentuali a caso e cariche fantasma). True quando c'e' la batteria col partitore.
+BATTERIA = False
 BAT_ADC = 3          # battery through a 1:2 divider
 BAT_DIVIDER = 2.0
 BAT_EMPTY_MV = 3300

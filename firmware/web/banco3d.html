@@ -29,7 +29,34 @@
   body:not(.closed) #apri { right: 372px; }
   #back { position: fixed; top: 12px; left: 12px; z-index: 3; color: var(--accent); background: rgba(20,24,32,.85); border: 1px solid var(--line); border-radius: 99px; padding: 8px 14px; text-decoration: none; font: 600 13px system-ui; }
   #hint { position: fixed; left: 12px; bottom: 12px; z-index: 1; color: var(--muted); font-size: 12px; pointer-events: none; }
+  #viste { position: fixed; top: 12px; left: 140px; z-index: 3; display: flex; gap: 4px; align-items: center; background: rgba(20,24,32,.85); border: 1px solid var(--line); border-radius: 99px; padding: 3px; }
+  #viste button { border: 0; background: none; color: var(--fg); font: 600 13px system-ui; padding: 6px 12px; border-radius: 99px; cursor: pointer; }
+  #viste button.on { background: var(--accent); color: #10140c; }
+  #eslab { display: none; font-size: 12px; color: var(--muted); padding: 0 8px; align-items: center; gap: 6px; }
+  body.finito #eslab { display: flex; } #eslab input { width: 90px; accent-color: var(--accent); }
+  body.finito .solobanco { display: none; }
+  .finwarn { display: none; } body.finito .finwarn { display: block; }
+  /* anteprima del display del telefono, in alto a sinistra */
+  #telbox { position: fixed; top: 56px; left: 12px; z-index: 3; background: #2a2e33; border: 1px solid var(--line); border-radius: 12px; padding: 8px 8px 6px; width: 270px; }
+  #telbox canvas { display: block; width: 252px; height: 144px; border-radius: 4px; image-rendering: pixelated; }
+  #telbox .t { font-size: 11px; color: var(--muted); margin: 0 0 5px; }
+  #telnota { font-size: 11.5px; color: #ffd28a; margin-top: 5px; min-height: 14px; }
+  #telfuoco { position: absolute; top: 26px; right: 14px; font-size: 30px; display: none; animation: pulsa .8s infinite alternate; }
+  @keyframes pulsa { to { transform: scale(1.25); } }
+  #stato { position: fixed; top: 12px; right: 150px; z-index: 3; border-radius: 99px; padding: 8px 16px; font: 700 13px system-ui; background: rgba(20,24,32,.9); border: 1px solid var(--line); white-space: nowrap; }
+  body:not(.closed) #stato { right: 512px; }
+  #stato.l0 { color: #9fe06a; border-color: #9fe06a; } #stato.l1 { color: #ffbe3c; border-color: #ffbe3c; } #stato.l2 { color: #ff7a6a; border-color: #ff7a6a; } #stato.l3 { color: #fff; background: #b3261e; border-color: #ff7a6a; }
+  .eff { border-left: 3px solid; padding: 6px 8px; margin: 6px 0; font-size: 12px; border-radius: 3px; background: rgba(255,255,255,.03); }
+  .eff.l0 { border-color: #9fe06a; } .eff.l1 { border-color: #ffbe3c; } .eff.l2 { border-color: #ff7a6a; } .eff.l3 { border-color: #ff3b30; background: rgba(255,59,48,.1); }
+  .bt button, .bt select { background: rgba(159,224,106,.12); color: var(--fg); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 10px; font: 600 12px system-ui; cursor: pointer; margin: 2px 0; }
+  .bt select { max-width: 150px; }
+  tr.gu td { color: #ffbe3c; }
+  .rad label { display: block; margin: 4px 0; }
   @media (max-width: 760px) {
+    #telbox { width: 182px; padding: 6px; } #telbox canvas { width: 168px; height: 96px; }
+    #stato { top: auto; right: auto; left: 12px; bottom: calc(52vh + 10px); font-size: 12px; }
+    body.closed #stato { bottom: 12px; } body:not(.closed) #stato { right: auto; }
+    #viste { top: 56px; left: 12px; } #telbox { top: 100px; }
     aside { top: auto; left: 0; width: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--line); }
     body.closed aside { transform: translateY(100%); }
     body:not(.closed) #apri { right: 12px; }
@@ -37,23 +64,36 @@
   }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
-<script>window.__err = []; addEventListener('error', e => __err.push(String(e.message))); addEventListener('unhandledrejection', e => __err.push(String(e.reason)));</script>
+<script>window.__err = []; addEventListener('error', e => __err.push(String(e.message) + ' @' + e.lineno)); addEventListener('unhandledrejection', e => __err.push(String(e.reason)));</script>
 </head>
 <body>
 <div id="scena"></div>
 <a id="back" href="./">&larr; simulatore</a>
+<div id="telbox"><p class="t">Display del telefono (cosa vedresti)</p><canvas id="tel" width="252" height="144"></canvas><div id="telnota"></div><div id="telfuoco">🔥</div></div>
+<div id="stato" class="l0">Telefono: ✅ funziona</div>
+<div id="viste"><button data-v="banco" class="on">Banco</button><button data-v="finito">Telefono finito</button><label id="eslab">esplodi <input type="range" id="esplodi" min="0" max="1" step="0.01" value="0.5"></label></div>
 <button id="apri">Collegamenti</button>
 <aside>
   <h1><b>A</b><small>ur</small><b>I</b>-3310 · banco ESP32</h1>
   <p>Il prototipo da banco come si monta davvero: due breadboard da 830 punti affiancate, il DevKit a cavallo, i moduli sul tavolo. Misure in millimetri, pin presi da <code>firmware/hal/board.py</code>.</p>
   <div id="info"></div>
+  <div class="warn finwarn"><b>Telefono finito</b>: sagoma della scheda da misurare sul telefono smontato (foto dall’alto con un righello accanto). Con la scheda assemblata da JLCPCB/PCBWay non si salda niente a mano: display, cupole, motorino e cicalino appoggiano su piazzole. Tocca le etichette per “come si monta”.</div>
+  <h2 class="solobanco">Prove guasti</h2>
+  <div id="prova" class="solobanco"></div>
+  <h2>Alimentazione</h2>
+  <div class="rad"><label><input type="radio" name="alim" value="usb" checked> USB-C (cavo nel DevKit o breakout sul pin 5V)</label><label><input type="radio" name="alim" value="car"> Caricatore originale 3310 (presa DC → diodo + fusibile → buck-boost 5 V)</label></div>
+  <h2>Saldature</h2>
+  <div class="tg"><label><input type="checkbox" id="saldOn" checked> Mostra le saldature</label><label><input type="checkbox" id="senzaSald"> Montaggio senza saldature</label></div>
+  <p id="saldsum"></p>
+  <div id="saldlista"></div>
   <h2>Avvisi</h2>
-  <div class="warn"><b>Solo 3,3 V</b> sui GPIO: nessun pin regge 5 V. Moduli e partitore vanno sulla barra rossa da 3V3, mai sul pin 5V.</div>
+  <div class="warn"><b>Solo 3,3 V</b> sui GPIO: nessun pin regge 5 V. I moduli vanno sulla barra rossa da 3V3, mai sul pin 5V.</div>
   <div class="warn"><b>GPIO 33-37 vietati</b>: sulla N8R8 sono della PSRAM ottale (35, 36, 37 sono sul connettore J3 ma non vanno usati).</div>
   <div class="warn"><b>GPIO 38 = LED RGB</b> del DevKitC-1 v1.1: con la microSD su MOSI 38 il LED lampeggia durante le scritture. Innocuo.</div>
   <div class="warn"><b>Pin di avvio</b>: GPIO 0 (BOOT, qui tasto Power), 3, 45, 46. Il tasto Power non va tenuto premuto all'accensione, se no la scheda entra in modalita download.</div>
-  <div class="warn"><b>Massa comune</b>: tutte le barre blu sono collegate tra loro e al GND del DevKit, anche il meno del TP4056 (OUT-).</div>
-  <div class="warn"><b>LiPo</b>: il banco va a USB. La batteria serve solo per provare carica (CHG) e lettura tensione (BAT_ADC): non collegarla mai al 3V3. Il pin CHRG del TP4056 non e sul bordo del modulo: si salda un filo al lato del LED rosso di carica.</div>
+  <div class="warn"><b>Massa comune</b>: tutte le barre blu sono collegate tra loro e al GND del DevKit, anche il meno dell’alimentazione (USB-C o buck-boost).</div>
+  <div class="warn"><b>Pezzi dal 3310 originale</b>: display, gomma e cupole dei tasti, motorino e cicalino (la batteria sul banco non serve). Il display ha contatti a molla: sul banco meglio un modulo 5110 da 3-4 euro, l’originale solo nel telefono finito.</div>
+  <div class="warn"><b>Niente batteria sul banco</b>: si alimenta con la USB-C o col caricatore originale 3310. GPIO 3 (BAT_ADC) e GPIO 21 (CHG) restano liberi. Il caricatore originale non va MAI diretto sui 3,3 V: a vuoto dà molto più dei 3,7 V scritti; serve diodo + fusibile + regolatore a 5 V sul pin 5V.</div>
   <div class="warn"><b>Microfono e amplificatore I2S</b>: in board.py i loro pin non ci sono ancora (il suono ora esce dal piezo su GPIO 47). Qui sono solo alimentati, i fili dati arrivano col prototipo H0. GPIO 1/2 (I2C) restano liberi.</div>
   <h2>Moduli</h2>
   <div class="tg" id="toggles"></div>

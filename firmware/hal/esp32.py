@@ -192,7 +192,13 @@ class ESP32Hal:
     # niente loc_*: il Nokia vero non ha un GPS (l'app lo dice)
 
     def battery(self):
+        if not getattr(board, 'BATTERIA', True):
+            return 100, False            # a rete: mai 0% (spegnerebbe tutto), mai carica fantasma
         mv = sum(self.adc.read_uv() for _ in range(8)) // 8000 * board.BAT_DIVIDER
+        # niente batteria (banco a USB o col caricatore): sotto 2,5 V una cella al litio non esiste,
+        # la sua protezione la stacca prima. Si dice "piena, a rete" invece di 0% (che spegnerebbe tutto)
+        if mv < 2500:
+            return 100, False
         pct = (mv - board.BAT_EMPTY_MV) * 100 // (board.BAT_FULL_MV - board.BAT_EMPTY_MV)
         return int(max(0, min(100, pct))), not self.chg()
 

@@ -85,6 +85,10 @@
   #mutebtn { position: absolute; top: 14px; left: 182px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: rgba(20,24,32,.8); color: var(--fg); font: 600 19px system-ui; cursor: pointer; }
   body.d3 #mutebtn { left: 126px; }
   body.full #mutebtn { display: none; }
+  /* banco ESP32 in 3D: sempre in alto a sinistra, accanto agli altri pulsanti */
+  #bancobtn { position: absolute; top: 14px; left: 238px; z-index: 2; height: 46px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--accent); background: rgba(20,24,32,.8); color: var(--accent); font: 600 13px system-ui; display: flex; align-items: center; gap: 6px; text-decoration: none; white-space: nowrap; backdrop-filter: blur(6px); }
+  body.d3 #bancobtn { left: 182px; }
+  body.full #bancobtn { display: none; }
   #infobtn { position: absolute; top: 14px; left: 126px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--accent); background: rgba(20,24,32,.8); color: var(--accent); font: 700 20px Georgia, serif; cursor: pointer; }
   #info { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(5,7,11,.72); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px; }
   #info.on { display: flex; }
@@ -153,6 +157,7 @@ addEventListener('load', () => setTimeout(() => document.body.classList.remove('
 <div id="view3d"></div>
 <button id="infobtn" title="Il progetto">i</button>
 <button id="mutebtn" title="Audio">&#x1F507;</button>
+<a id="bancobtn" href="banco3d.html" title="Banco ESP32 in 3D: come collegare il prototipo">&#x1F50C; Banco ESP32</a>
 <div id="info"><div class="card">
   <button class="close" id="infoclose" title="Chiudi">&#x2715;</button>
   <h2>A<small>ur</small>I-3310</h2>
