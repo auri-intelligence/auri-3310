@@ -325,6 +325,7 @@ window.auriBeep = (f, ms, vol = 3) => {
   } catch {}
 };
 let beepOsc = null, beepGain = null;
+window.auriAudioPausa = on => { try { if (audio) (on ? audio.suspend() : audio.resume()); } catch {} };
 // Audio: il browser non sa se il telefono e' in silenzioso. Sul telefono si parte muti, il pulsante
 // lo accende (e la scelta resta). Accendendo suona un bip, cosi' i tasti del volume agiscono subito.
 const MOBILE_UA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);

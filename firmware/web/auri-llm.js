@@ -396,17 +396,60 @@
   const LANGS = { it: 'it-IT', en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', pt: 'pt-PT' };
   let rec = null, heard = '', hearDone = true, hearErr = '';
 
+  // --- misuratore del microfono: livello vero in dB (-60..0 -> 0..100) per le tacche "ti ascolto" ---
+  // Su alcuni Android aprire il microfono due volte (misuratore + riconoscimento) fa fallire il riconoscimento:
+  // se succede, il misuratore si spegne da solo e la scelta resta (auri.mic.nometro).
+  let metro = null, livello = 0;
+  async function apriMetro() {
+    if (metro || store.get('auri.mic.nometro', '') === '1' || !navigator.mediaDevices) return;
+    try {
+      const flusso = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const an = ctx.createAnalyser();
+      an.fftSize = 512;
+      ctx.createMediaStreamSource(flusso).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      metro = { flusso, ctx, an, buf, timer: setInterval(() => {
+        an.getFloatTimeDomainData(buf);
+        let q = 0;
+        for (let i = 0; i < buf.length; i++) q += buf[i] * buf[i];
+        const db = 20 * Math.log10(Math.sqrt(q / buf.length) + 1e-9);
+        livello = Math.max(0, Math.min(100, Math.round((db + 60) * 100 / 60)));
+      }, 50) };
+      window.auriLog('voce', 'Misuratore del microfono acceso');
+    } catch (e) {
+      window.auriWarn('voce', 'Misuratore non disponibile: ' + ((e && e.name) || e));
+    }
+  }
+  function chiudiMetro() {
+    if (!metro) return;
+    clearInterval(metro.timer);
+    try { metro.flusso.getTracks().forEach(t => t.stop()); } catch (e) {}
+    try { metro.ctx.close(); } catch (e) {}
+    metro = null;
+    livello = 0;
+  }
+  window.auriMicLevel = () => livello;
+  let sentito = false;
+
   window.auriHearStart = lang => {
     if (!SR) return 0;
     heard = '';
     hearErr = '';
     hearDone = false;
+    sentito = false;
+    // niente audio nostro mentre si ascolta: su Android un AudioContext attivo puo' disturbare il riconoscimento
+    try { if (window.auriAudioPausa) window.auriAudioPausa(true); speechSynthesis.cancel(); } catch (e) {}
+    apriMetro();
     try {
       rec = new SR();
       rec.lang = LANGS[String(lang || 'it')] || 'it-IT';
       rec.interimResults = true;
       rec.continuous = false;
       rec.maxAlternatives = 1;
+      rec.onaudiostart = () => window.auriLog('voce', 'Riconoscimento: microfono aperto');
+      rec.onsoundstart = () => { sentito = true; window.auriLog('voce', 'Riconoscimento: sento un suono'); };
+      rec.onspeechstart = () => window.auriLog('voce', 'Riconoscimento: sento parlare');
       rec.onresult = e => {
         let s = '';
         for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript;
@@ -414,11 +457,22 @@
       };
       rec.onerror = e => {
         const c = String(e.error || 'errore');
+        window.auriWarn('voce', 'Riconoscimento: errore ' + c + (metro ? ' (con misuratore acceso)' : ''));
+        // microfono conteso o silenzio col misuratore acceso: la prossima volta si ascolta senza misuratore
+        if (metro && (c === 'audio-capture' || c === 'no-speech' || c === 'aborted')) {
+          store.set('auri.mic.nometro', '1');
+          window.auriWarn('voce', 'Misuratore spento per le prossime volte: il microfono non regge due ascolti');
+        }
         // 'not-allowed' vuol dire permesso negato: sul display si dice come si rimedia
         hearErr = (c === 'not-allowed' || c === 'service-not-allowed') ? 'no_mic' : c;
         hearDone = true;
       };
-      rec.onend = () => { hearDone = true; };
+      rec.onend = () => {
+        hearDone = true;
+        window.auriLog('voce', 'Riconoscimento finito: ' + (heard ? '"' + heard.slice(0, 60) + '"' : 'niente testo') + (sentito ? '' : ', nessun suono'));
+        chiudiMetro();
+        try { if (window.auriAudioPausa) window.auriAudioPausa(false); } catch (e) {}
+      };
       rec.start();
       return 1;
     } catch (e) {

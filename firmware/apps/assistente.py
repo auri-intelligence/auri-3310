@@ -72,6 +72,26 @@ class Assistente(App):
         self.brain.chiedi(testo)
         self._pensa()
 
+    def _tacche(self, g):
+        """Tacche "ti ascolto": se la HAL misura il microfono si muovono con i decibel veri (storia degli
+        ultimi livelli, da destra a sinistra), cosi' si vede subito se il microfono sente; se no animazione."""
+        f = getattr(self.sys.hal, 'mic_level', None)
+        lv = f() if f else -1
+        if lv < 0:
+            now = self.sys.hal.ticks_ms()
+            for i in range(9):
+                h = 2 + ((now // 90 + i * 7) % 9)
+                g.fill_rect(15 + i * 6, 32 - h // 2, 3, h)
+            return
+        st = getattr(self, '_livelli', None)
+        if st is None:
+            st = self._livelli = [0] * 13
+        st.append(lv)
+        del st[0]
+        for i, v in enumerate(st):
+            h = max(1, v * 16 // 100)
+            g.fill_rect(3 + i * 6, 32 - h // 2, 4, h)
+
     def _pensa(self):
         """Entra in "sto pensando": riparte il conto dei secondi e delle frasi d'attesa (T9, voce o bridge)."""
         if self.state != 'think':
@@ -197,7 +217,7 @@ class Assistente(App):
             if r is not None and r[0] != self.heard:
                 self.heard = r[0]
                 return True
-            return (now // 150) % 2 == 0
+            return True               # tacche del microfono: si ridisegnano a ogni passo
         if self.state == 'hear':
             r = self.brain.ascolto_poll()
             if r is None:
@@ -356,10 +376,7 @@ class Assistente(App):
                 for i, line in enumerate(wrap(self.heard)[-2:]):
                     g.text(line, 0, 20 + i * 9)
             else:
-                now = self.sys.hal.ticks_ms()
-                for i in range(9):
-                    h = 2 + ((now // 90 + i * 7) % 9)
-                    g.fill_rect(15 + i * 6, 32 - h // 2, 3, h)
+                self._tacche(g)
             softkey(g, t('release_send'))
             return
         if self.state == 'hear':

@@ -165,6 +165,13 @@ class WebHal:
         except Exception:
             return False
 
+    def mic_level(self):
+        """Livello del microfono 0..100 (dB veri), -1 se non c'e' un misuratore."""
+        try:
+            return int(js.auriMicLevel())
+        except Exception:
+            return -1
+
     def hear_stop(self):
         js.auriHearStop()
 
