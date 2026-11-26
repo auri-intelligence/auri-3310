@@ -299,20 +299,32 @@ window.auriTime = () => {
   const d = new Date();
   return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), (d.getDay() + 6) % 7, 0].join(',');
 };
+// vibrazione: niente "void offsetWidth" (forzava il ricalcolo della pagina a ogni urto, ~1 ms)
 window.auriVibrate = ms => {
-  phone.classList.remove('shake'); void phone.offsetWidth; phone.classList.add('shake');
+  phone.classList.remove('shake');
+  requestAnimationFrame(() => phone.classList.add('shake'));
   if (navigator.vibrate) navigator.vibrate(ms);
 };
 let audio;
 window.auriBeep = (f, ms, vol = 3) => {
   if (window.auriMuted) return;
+  // un solo oscillatore sempre acceso (il 3310 era monofonico): a ogni bip si cambiano solo nota e
+  // volume, invece di creare e collegare nodi nuovi ogni volta (era la meta' del costo di un passo di gioco)
   try {
-    audio = audio || new AudioContext();
-    const o = audio.createOscillator(), g = audio.createGain();
-    o.type = 'square'; o.frequency.value = f; g.gain.value = 0.012 * vol;
-    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + ms / 1000);
+    if (!audio) {
+      audio = new AudioContext();
+      beepOsc = audio.createOscillator(); beepGain = audio.createGain();
+      beepOsc.type = 'square'; beepGain.gain.value = 0;
+      beepOsc.connect(beepGain).connect(audio.destination); beepOsc.start();
+    }
+    const t = audio.currentTime;
+    beepOsc.frequency.setValueAtTime(f, t);
+    beepGain.gain.cancelScheduledValues(t);
+    beepGain.gain.setValueAtTime(0.012 * vol, t);
+    beepGain.gain.setValueAtTime(0, t + ms / 1000);
   } catch {}
 };
+let beepOsc = null, beepGain = null;
 // Audio: il browser non sa se il telefono e' in silenzioso. Sul telefono si parte muti, il pulsante
 // lo accende (e la scelta resta). Accendendo suona un bip, cosi' i tasti del volume agiscono subito.
 const MOBILE_UA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -462,6 +474,8 @@ const press = k => {
 };
 const release = k => ready && py(`hal.release('${k}')`);
 window.auriPress = press;
+// solo per il banco di prova (tools/banco_telefono.py): esegue Python dentro AurI OS
+if (location.hash.includes('banco')) window.auriPy = code => { py(code); return true; };
 window.auriRelease = release;
 
 phone.addEventListener('contextmenu', e => e.preventDefault());
@@ -520,7 +534,8 @@ addEventListener('keyup', e => {
     // Fuori dal PC o dalla rete di casa (es. GitHub Pages) non esiste nessun bridge: niente richieste verso
     // la rete di chi visita, e le funzioni che ne hanno bisogno spiegano perche' non ci sono.
     const LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);
-    if (!LOCAL) { const c2 = JSON.parse(cfg); c2.bridge_url = ''; c2.token = ''; c2.online = true; cfg = JSON.stringify(c2); }
+    // #online: in locale ci si comporta come il sito pubblico (niente bridge) - serve al banco di prova
+    if (!LOCAL || location.hash.includes('online')) { const c2 = JSON.parse(cfg); c2.bridge_url = ''; c2.token = ''; c2.online = true; cfg = JSON.stringify(c2); }
     // world leaderboard address, a plain text file in the repo
     const sc = await fetch('classifica.txt', { cache: 'no-store' }).catch(() => null);
     const su = sc && sc.ok ? (await sc.text()).trim() : '';

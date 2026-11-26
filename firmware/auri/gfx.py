@@ -114,12 +114,22 @@ class Canvas:
 
     def dither(self, x, y, w, h, level=2):
         # fake grey on a 1-bit LCD: 1 = 25%, 2 = 50%, 3 = 75% of the pixels on
-        for j in range(h):
-            for i in range(w):
-                px, py = x + i, y + j
-                on = (px + py) % 2 == 0 if level == 2 else (px % 2 == 0 and py % 2 == 0) if level == 1 else not (px % 2 == 0 and py % 2 == 0)
-                if on:
-                    self.pixel(px, py)
+        # cicli a passo 2: si toccano solo i pixel accesi, niente controlli pixel per pixel
+        pix = self.pixel
+        if level == 3:
+            for py in range(y, y + h):
+                if py & 1:
+                    self.hline(x, py, w)
+                else:
+                    for px in range(x + 1 - (x & 1), x + w, 2):
+                        pix(px, py)
+            return
+        for py in range(y, y + h):
+            if level == 1 and py & 1:
+                continue
+            start = x + ((x + py) & 1) if level == 2 else x + (x & 1)
+            for px in range(start, x + w, 2):
+                pix(px, py)
 
     def panel(self, x, y, w, h):
         # rounded box with a dithered drop shadow: the "modern" container of popups

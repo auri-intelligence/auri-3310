@@ -53,9 +53,11 @@
       localStorage.setItem(BEAT, JSON.stringify({ ts: Date.now(), pulito, app: window.auriTop || '', fase, mem: mem() }));
     } catch (e) {}
   }
-  setInterval(() => { battito(false); salva(); }, 1000);
+  // una scheda in secondo piano che il telefono chiude per fare spazio NON e' un crash: conta solo
+  // se muore mentre e' visibile
+  setInterval(() => { battito(document.hidden); salva(); }, 1000);
   addEventListener('pagehide', () => { log('INFO', 'avvio', 'Pagina chiusa normalmente'); salva(); battito(true); });
-  document.addEventListener('visibilitychange', () => log('INFO', 'pagina', document.hidden ? 'Scheda in secondo piano' : 'Scheda di nuovo visibile'));
+  document.addEventListener('visibilitychange', () => { log('INFO', 'pagina', document.hidden ? 'Scheda in secondo piano' : 'Scheda di nuovo visibile'); battito(document.hidden); salva(); });
 
   // --- errori JS e promesse rifiutate ---
   addEventListener('error', e => log('ERR', 'js', `${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno || '?'})`));
@@ -87,7 +89,7 @@
   const pronto = LOCALE ? Promise.resolve(null) :
     fetch('classifica.txt', { cache: 'no-store' }).then(r => r.ok ? r.text() : '').then(t => { t = t.trim(); urlReg = t.startsWith('https://') ? t : null; }).catch(() => {});
   function manda(motivo) {
-    if (LOCALE || invii >= 6) return;
+    if (LOCALE || invii >= 6 || location.hash.includes('banco')) return;
     if (inAttesa) return;
     const attesa = Math.max(0, 8000 - (Date.now() - ultimo));
     inAttesa = setTimeout(async () => {

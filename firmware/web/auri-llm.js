@@ -19,13 +19,15 @@
     mini: { name: 'Mini 360M', mb: 207, f16: 'SmolLM2-360M-Instruct-q4f16_1-MLC', f32: 'SmolLM2-360M-Instruct-q4f32_1-MLC' },
     base: { name: 'Base 0.5B', mb: 290, f16: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', f32: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC' },
     pensa: { name: 'Pensa 0.6B', mb: 352, f16: 'Qwen3-0.6B-q4f16_1-MLC', f32: 'Qwen3-0.6B-q4f32_1-MLC', think: true },
-    grande: { name: 'Grande 1.5B', mb: 880, f16: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', f32: 'Qwen2.5-1.5B-Instruct-q4f32_1-MLC' },
+    grande: { name: 'Grande 1.5B', mb: 880, pc: true, f16: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', f32: 'Qwen2.5-1.5B-Instruct-q4f32_1-MLC' },
   };
   // Su smartphone il browser limita la memoria della GPU (buffer da 128 MB): il modello piccolo e'
   // l'unico che gira davvero, e si scarica meno anche sotto rete mobile.
   const MOBILE = (navigator.userAgentData && navigator.userAgentData.mobile)
     || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
-  const DEFAULT = MOBILE ? 'mini' : 'base';
+  // Base (Qwen 0.5B) anche sul telefono: nel banco di prova il Mini in italiano si incanta e dice frasi
+  // senza senso; se il Base non regge si scende da soli al Mini (vedi startNow e askNow).
+  const DEFAULT = 'base';
 
   const st = {
     key: DEFAULT,        // modello scelto
@@ -46,7 +48,7 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch {} },
   };
   const saved = store.get('auri.cervello.modello', DEFAULT);
-  st.key = MODELS[saved] ? saved : DEFAULT;
+  st.key = MODELS[saved] && !(MOBILE && MODELS[saved].pc) ? saved : DEFAULT;
   st.speak = store.get('auri.cervello.voce', '1') === '1';
 
   const track = n => { try { window.auriTrack && window.auriTrack(n); } catch {} };
@@ -77,7 +79,7 @@
     gpuSoft = !!a.isFallbackAdapter || /swiftshader|llvmpipe|software|basic render/i.test(gpuName);
     // Senza "shader-f16" si usa la versione f32: piu' grande da scaricare e parecchio piu' lenta.
     // Se l'utente non ha scelto un modello a mano, si parte dal piu' piccolo.
-    if (!f16 && !store.get('auri.cervello.modello', '')) st.key = 'mini';
+    if (!f16 && !MOBILE && !store.get('auri.cervello.modello', '')) st.key = 'mini';
     return { ok: true, reason: '' };
   }
 
@@ -98,7 +100,7 @@
   }
 
   async function startNow(key) {
-    if (key && MODELS[key]) { st.key = key; store.set('auri.cervello.modello', key); }
+    if (key && MODELS[key] && !(MOBILE && MODELS[key].pc)) { st.key = key; store.set('auri.cervello.modello', key); }
     const gpu = await checkGpu();
     if (!gpu.ok) {
       st.phase = 'err';
@@ -161,6 +163,17 @@
         await crea();
       }
       engine.__idb = idb;
+      st.note = 'Mi preparo...';
+      if (ui) ui();
+      const tw = performance.now();
+      try {
+        const req = { messages: [{ role: 'user', content: 'Ciao' }], max_tokens: 2, temperature: 0 };
+        if ((MODELS[st.key] || {}).think) req.extra_body = { enable_thinking: false };
+        await engine.chat.completions.create(req);
+        window.auriLog('cervello', `Riscaldamento GPU fatto in ${((performance.now() - tw) / 1000).toFixed(1)} s`);
+      } catch (e) {
+        window.auriWarn('cervello', 'Riscaldamento non riuscito: ' + String((e && e.message) || e).slice(0, 120));
+      }
       window.auriLog('cervello', 'Modello pronto');
       st.phase = 'ready';
       st.pct = 100;
@@ -168,8 +181,22 @@
       if (ui) ui();
       track('cervello/pronto');
     } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (st.key !== 'mini' && GPU_ERR.test(msg)) {
+        // troppo pesante per questa GPU: si riprova da soli con il Mini
+        window.auriWarn('cervello', `Il modello ${st.key} non entra in questa GPU (${msg.slice(0, 80)}): passo a Mini`);
+        track('cervello/scende_a_mini');
+        st.key = 'mini';
+        store.set('auri.cervello.modello', 'mini');
+        try { if (engine) await engine.unload(); } catch (e2) {}
+        engine = null;
+        try { if (worker) worker.terminate(); } catch (e3) {}
+        worker = null;
+        st.phase = 'off';
+        return startNow('mini');
+      }
       st.phase = 'err';
-      st.error = String((e && e.message) || e).slice(0, 200);
+      st.error = msg.slice(0, 200);
       window.auriErr('cervello', 'Il modello non si accende: ' + st.error);
       if (ui) ui();
       track('cervello/errore');
@@ -247,6 +274,10 @@
         temperature: (opts && opts.temperature) || 0.5,
         top_p: 0.9,
         max_tokens: (opts && opts.max_tokens) || 150,
+        // i modelli piccoli in italiano tendono a incantarsi e ripetere (visto nel banco di prova)
+        frequency_penalty: 0.6,
+        presence_penalty: 0.3,
+        repetition_penalty: 1.15,
       };
       // Qwen3 di suo "ragiona" ad alta voce: su un display di 14 colonne non serve.
       if ((MODELS[st.key] || {}).think) req.extra_body = { enable_thinking: false };
@@ -263,6 +294,14 @@
           if (!n) window.auriLog('cervello', `Primo pezzo di risposta dopo ${Math.round(performance.now() - t0)} ms`);
           st.text += d;
           n++;
+          // se si sta ripetendo (lo stesso pezzo di 12+ caratteri per la terza volta) si ferma qui
+          const coda = st.text.slice(-16);
+          if (st.text.length > 60 && coda.trim().length >= 12 && st.text.split(coda).length > 3) {
+            window.auriWarn('cervello', 'Il modello si ripeteva: risposta fermata');
+            st.text = st.text.slice(0, st.text.indexOf(coda) + coda.length).trim();
+            try { await engine.interruptGenerate(); } catch (e) {}
+            break;
+          }
           leggiAvanti(false);
           if (ui) ui();
         }
@@ -275,7 +314,7 @@
     } catch (e) {
       const msg = String((e && e.message) || e);
       window.auriErr('cervello', 'Errore durante la risposta: ' + msg.slice(0, 250));
-      if (mine === gen && GPU_ERR.test(msg) && tentativo === 0 && !st.text) {
+      if (mine === gen && GPU_ERR.test(msg) && tentativo < 2 && !st.text) {
         // la GPU del telefono si e' inceppata: si ricarica il modello (dalla cache, pochi secondi)
         track('cervello/ripresa_gpu');
         window.auriWarn('cervello', 'La GPU si e\' inceppata: ricarico il modello e riprovo');
@@ -283,7 +322,13 @@
         engine = null;
         if (worker) { try { worker.terminate(); } catch (e3) {} worker = null; }
         st.phase = 'off';
-        return askNow(messages, opts, mine, 1);
+        if (tentativo === 1 && st.key !== 'mini') {
+          window.auriWarn('cervello', `Il modello ${st.key} e' troppo pesante per questa GPU: passo a Mini`);
+          track('cervello/scende_a_mini');
+          st.key = 'mini';
+          store.set('auri.cervello.modello', 'mini');
+        }
+        return askNow(messages, opts, mine, tentativo + 1);
       }
       if (mine === gen) { st.error = friendly(msg); track('cervello/errore_' + st.error); }
     }
@@ -304,7 +349,7 @@
   window.auriAiStart = key => {
     if (key === 'auto') {
       store.set('auri.cervello.modello', '');
-      st.key = (MOBILE || f16 === false) ? 'mini' : DEFAULT;
+      st.key = (f16 === false && !MOBILE) ? 'mini' : DEFAULT;
       key = st.key;
     }
     start(key || st.key);
@@ -334,7 +379,8 @@
     return '';
   };
 
-  window.auriAiModels = () => JSON.stringify(Object.keys(MODELS).map(k => [k, MODELS[k].name, MODELS[k].mb]));
+  const adatto = k => !(MOBILE && MODELS[k].pc);     // sui telefoni niente modelli solo-PC
+  window.auriAiModels = () => JSON.stringify(Object.keys(MODELS).filter(adatto).map(k => [k, MODELS[k].name, MODELS[k].mb]));
 
   // --- voce: ascolto (riconoscimento del browser) ------------------------
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -456,6 +502,7 @@
     row.innerHTML = '<select style="flex:1"></select><button type="button">Accendi</button>';
     const sel = row.querySelector('select'), btn = row.querySelector('button');
     for (const [k, m] of Object.entries(MODELS)) {
+      if (MOBILE && m.pc) continue;
       const o = document.createElement('option');
       o.value = k;
       o.textContent = m.name + ' · ' + m.mb + ' MB';
