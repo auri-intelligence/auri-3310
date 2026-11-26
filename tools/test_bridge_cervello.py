@@ -155,6 +155,22 @@ def test_spento():
     print('ok  se il cervello e spento lo dice invece di sembrare rotto')
 
 
+def test_sicurezza():
+    """Il telefono non puo' chiedere Claude senza permessi; CORS solo per il simulatore in casa."""
+    vecchio = b.cfg
+    b.cfg = {}
+    assert b.modo_permessi('bypassPermissions') == 'default'
+    assert b.modo_permessi('acceptEdits') == 'acceptEdits' and b.modo_permessi(None) == 'default'
+    assert b.modo_permessi('qualsiasi') == 'default'
+    b.cfg = {'allow_bypass': True}
+    assert b.modo_permessi('bypassPermissions') == 'bypassPermissions'
+    assert b.origine_ok('http://127.0.0.1:8000') and b.origine_ok('http://192.168.1.130:8000')
+    assert not b.origine_ok('https://sito-qualsiasi.example') and not b.origine_ok(None)
+    assert not b.origine_ok('http://172.40.0.1:8000')
+    b.cfg = vecchio
+    print('ok  sicurezza: niente bypass dei permessi dal telefono, CORS solo locale')
+
+
 if __name__ == '__main__':
     vero_up = b.llm_up
     test_risposta()
@@ -163,5 +179,6 @@ if __name__ == '__main__':
     test_casa()
     test_motore()
     test_spento()
+    test_sicurezza()
     b.llm_up = vero_up
     print('\ntutti i test passati.')

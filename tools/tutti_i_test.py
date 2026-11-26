@@ -10,7 +10,7 @@ import sys
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PC = ['test_cervello', 'test_bridge_cervello', 'test_camera', 'test_novita', 'test_llm_esp32', 'test_giochi',
+PC = ['test_avvio', 'test_cervello', 'test_bridge_cervello', 'test_camera', 'test_novita', 'test_llm_esp32', 'test_giochi',
       'test_esp32_finto', 'compila_mpy']
 BANCHI = [['confronta_framebuf'], ['banco_telefono', '--modello', 'auto', '--nota', 'tutti_i_test'],
           ['banco_nokia', '--nota', 'tutti_i_test']]

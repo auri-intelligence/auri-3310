@@ -132,6 +132,8 @@
         if (ui) ui();
       };
       const id = modelId(st.key);
+      // chiede al browser di non cancellare il modello scaricato quando lo spazio scarseggia (Android)
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => window.auriLog('cervello', 'Spazio persistente: ' + (ok ? 'si' : 'no'))); } catch (e) {}
       // Sui browser dei telefoni la memoria della GPU e' limitata (buffer da 128 MB): con una
       // finestra di contesto piu' corta il modello ci sta, con quella piena fallisce e basta.
       const chatOpts = { context_window_size: MOBILE ? 1024 : 2048 };
@@ -172,7 +174,10 @@
         await engine.chat.completions.create(req);
         window.auriLog('cervello', `Riscaldamento GPU fatto in ${((performance.now() - tw) / 1000).toFixed(1)} s`);
       } catch (e) {
-        window.auriWarn('cervello', 'Riscaldamento non riuscito: ' + String((e && e.message) || e).slice(0, 120));
+        const m = String((e && e.message) || e);
+        window.auriWarn('cervello', 'Riscaldamento non riuscito: ' + m.slice(0, 120));
+        // GPU persa gia' qui: il motore non e' utilizzabile, si ricrea (o si scende a Mini) invece di dirlo pronto
+        if (GPU_ERR.test(m)) throw e;
       }
       window.auriLog('cervello', 'Modello pronto');
       st.phase = 'ready';
@@ -217,7 +222,7 @@
   }
 
   // Errori della GPU dei telefoni (buffer, device perso, modello scaricato): si ricarica e si riprova.
-  const GPU_ERR = /not loaded|unmapped|mapping|device (was )?lost|GPUBuffer|out of memory|DXGI|destroyed/i;
+  const GPU_ERR = /not loaded|unmapped|mapping|device (was )?lost|GPUBuffer|out of memory|DXGI|destroyed|disposed|Instance reference|Internal error/i;
   let chain = Promise.resolve();
   function ask(messages, opts) {
     const mine = ++gen;
@@ -275,12 +280,16 @@
         top_p: 0.9,
         max_tokens: (opts && opts.max_tokens) || 150,
         // i modelli piccoli in italiano tendono a incantarsi e ripetere (visto nel banco di prova)
-        frequency_penalty: 0.6,
-        presence_penalty: 0.3,
-        repetition_penalty: 1.15,
+        // leggera: con penalita' forti i modelli piccoli storpiano le parole (ricerca, docs/ricerca/cervello-browser.md);
+        // contro i giri a vuoto c'e' comunque lo stop automatico qui sotto
+        repetition_penalty: 1.05,
       };
       // Qwen3 di suo "ragiona" ad alta voce: su un display di 14 colonne non serve.
-      if ((MODELS[st.key] || {}).think) req.extra_body = { enable_thinking: false };
+      if ((MODELS[st.key] || {}).think) {
+        // Qwen3: l'opzione da sola non basta in WebLLM (nel banco ragionava e finiva i pezzi): /no_think nel prompt
+        req.extra_body = { enable_thinking: false };
+        req.messages = messages.map((m, i) => (i === 0 && m.role === 'system') ? { role: 'system', content: m.content + ' /no_think' } : m);
+      }
       const out = await engine.chat.completions.create(req);
       for await (const chunk of out) {
         if (mine !== gen) return;

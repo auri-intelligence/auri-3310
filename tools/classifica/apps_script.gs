@@ -17,6 +17,33 @@ function norm(s) {
   return out;
 }
 
+// Un testo che comincia con = + - @ nel foglio diventerebbe una formula (formula injection): si neutralizza.
+function pulito(v, max) {
+  const s = String(v || '').replace(/[\x00-\x1f]/g, ' ').slice(0, max);
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
+// Limite di frequenza con la cache dello script: true se la chiave e' gia' stata usata da poco.
+function troppoPresto(chiave, secondi) {
+  const c = CacheService.getScriptCache();
+  if (c.get(chiave)) return true;
+  c.put(chiave, '1', secondi);
+  return false;
+}
+
+// Stessa firma del telefono (FNV-1a di gioco|nome|punti|chiave): ferma chi scrive a mano l'indirizzo.
+// La chiave (SEGNO_CHIAVE nelle Proprieta' dello script) e' quella di scores_key nel config, vuota se non c'e'.
+function firmaGiusta(gioco, nome, punti, firma) {
+  const k = PropertiesService.getScriptProperties().getProperty('SEGNO_CHIAVE') || '';
+  const s = gioco + '|' + nome + '|' + punti + '|' + k;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return ('00000000' + h.toString(16)).slice(-8) === String(firma || '');
+}
+
 function risposta(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -30,10 +57,17 @@ function foglioRegistro() {
 }
 
 function registro(p) {
-  const testo = String(p.registro || '').slice(0, 6000);
-  const sessione = String(p.sessione || '').slice(0, 16);
-  const motivo = String(p.motivo || '').slice(0, 120);
+  const testo = pulito(p.registro, 6000);
+  const sessione = pulito(p.sessione, 16);
+  const motivo = pulito(p.motivo, 120);
   if (!testo) return risposta({ ok: false });
+  // niente riempimento del foglio: un invio ogni 10 s per sessione e al massimo 120 al minuto in tutto
+  if (troppoPresto('reg_' + sessione, 10)) return risposta({ ok: false, errore: 'presto' });
+  const minuto = 'reg_min_' + Math.floor(Date.now() / 60000);
+  const c = CacheService.getScriptCache();
+  const n = parseInt(c.get(minuto) || '0', 10) + 1;
+  c.put(minuto, String(n), 120);
+  if (n > 120) return risposta({ ok: false, errore: 'presto' });
   const f = foglioRegistro();
   f.appendRow([new Date(), sessione, motivo, testo]);
   if (f.getLastRow() > 2000) f.deleteRows(1, f.getLastRow() - 2000);   // tiene le ultime 2000
@@ -64,8 +98,9 @@ function doGet(e) {
   const punti = parseInt(p.punti, 10);
   if (nome) {
     const n = norm(nome);
-    const ok = nome.length >= 3 && nome.length <= 10 && /^[A-Za-z0-9 ._-]+$/.test(nome) &&
-      punti > 0 && punti <= MAX_PUNTI && !BAD.some(w => n.indexOf(norm(w)) >= 0);
+    const ok = nome.length >= 3 && nome.length <= 10 && /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/.test(nome) &&
+      punti > 0 && punti <= MAX_PUNTI && !BAD.some(w => n.indexOf(norm(w)) >= 0) &&
+      firmaGiusta(gioco, nome, punti, p.firma) && !troppoPresto('pt_' + gioco + '_' + nome.toLowerCase(), 5);
     if (ok) {
       const lock = LockService.getScriptLock();
       lock.waitLock(5000);

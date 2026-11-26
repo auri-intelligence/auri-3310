@@ -10,6 +10,15 @@ import sys
 
 
 class NoCache(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        # config.json contiene il token del bridge (e magari il Wi-Fi): dalla rete di casa non si legge
+        nome = self.path.split('?')[0].rstrip('/').rsplit('/', 1)[-1]
+        locale = self.client_address[0] in ('127.0.0.1', '::1')
+        if not locale and (nome == 'config.json' or nome.startswith('.')):
+            self.send_error(404)
+            return
+        super().do_GET()
+
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store, must-revalidate')
         self.send_header('Expires', '0')

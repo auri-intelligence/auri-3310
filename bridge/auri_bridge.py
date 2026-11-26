@@ -126,7 +126,7 @@ class Run:
         opts = ClaudeAgentOptions(
             model=r.get('model') or None,
             effort=r.get('effort') or None,
-            permission_mode=r.get('permission_mode') or 'default',
+            permission_mode=modo_permessi(r.get('permission_mode')),
             resume=r.get('session') or None,
             cwd=cfg['cwd'],
             setting_sources=['user', 'project', 'local'],
@@ -249,8 +249,12 @@ def sensors_push(req):
         return {'ok': False}
     for key, (unit, dev) in SENSORS.items():
         if key in req:
+            try:
+                valore = round(float(req[key]), 2)      # solo numeri: niente testo arbitrario in Home Assistant
+            except (TypeError, ValueError):
+                continue
             ha('POST', '/api/states/sensor.auri_3310_' + key, {
-                'state': req[key],
+                'state': valore,
                 'attributes': {'unit_of_measurement': unit, 'device_class': dev,
                                'friendly_name': 'AurI-3310 ' + key}})
     return {'ok': True}
@@ -597,6 +601,29 @@ def voice(req):
     return out
 
 
+def modo_permessi(chiesto):
+    """La modalita' di Claude la sceglie il telefono, ma solo tra quelle permesse: 'bypassPermissions'
+    (comandi senza conferma) solo se il config lo dice esplicitamente con allow_bypass: true."""
+    sicuri = ('default', 'acceptEdits', 'plan')
+    if chiesto in sicuri:
+        return chiesto
+    if chiesto == 'bypassPermissions' and cfg.get('allow_bypass') is True:
+        return chiesto
+    return 'default'
+
+
+def origine_ok(origin):
+    """CORS solo per il simulatore servito in locale o nella rete di casa, non per un sito qualsiasi."""
+    if not origin:
+        return False
+    host = urllib.parse.urlparse(origin).hostname or ''
+    return (host in ('localhost', '127.0.0.1', '::1') or host.startswith('192.168.') or host.startswith('10.')
+            or any(host.startswith('172.%d.' % i) for i in range(16, 32)))
+
+
+MAX_CORPO = 8 * 1024 * 1024        # la voce arriva come audio: 8 MB bastano, oltre e' un abuso
+
+
 # HTTP ---------------------------------------------------------------------
 
 class Handler(BaseHTTPRequestHandler):
@@ -604,8 +631,11 @@ class Handler(BaseHTTPRequestHandler):
         data = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        origin = self.headers.get('Origin')
+        if origine_ok(origin):
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Vary', 'Origin')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -624,7 +654,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/v1/info':
                 up = llm_up(0.5)
                 return self._send(200, {'version': claude_version(), 'plan': cfg.get('plan', 'Claude'),
-                                        'cwd': cfg['cwd'], 'assist': assist_engine(up), 'llm': up})
+                                        'cwd': os.path.basename(cfg['cwd'].rstrip('/\\')) or '~',
+                                        'assist': assist_engine(up), 'llm': up})
             if self.path == '/v1/home':
                 return self._send(200, home_list())
             self._send(404, {'error': msg(None, 'not_found')})
@@ -634,8 +665,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._authorized():
             return self._send(401, {'error': msg(None, 'unauthorized')})
-        n = int(self.headers.get('Content-Length', 0))
-        req = json.loads(self.rfile.read(n) or b'{}')
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+        except ValueError:
+            n = -1
+        if n < 0 or n > MAX_CORPO:
+            return self._send(413, {'error': msg(None, 'server')})
+        try:
+            req = json.loads(self.rfile.read(n) or b'{}')
+        except ValueError:
+            return self._send(400, {'error': msg(None, 'server')})
+        if not isinstance(req, dict):
+            return self._send(400, {'error': msg(None, 'server')})
         routes = {'/v1/chat': chat, '/v1/confirm': confirm, '/v1/voice': voice,
                   '/v1/home/toggle': home_toggle, '/v1/sensors': sensors_push}
         fn = routes.get(self.path)
@@ -658,7 +699,12 @@ def main():
     path = a.config if os.path.exists(a.config) else os.path.join(HERE, 'config.example.json')
     cfg = load_config(path)
     threading.Thread(target=loop.run_forever, daemon=True).start()
-    srv = ThreadingHTTPServer((cfg.get('host', '0.0.0.0'), cfg['port']), Handler)
+    host = cfg.get('host', '0.0.0.0')
+    if host not in ('127.0.0.1', 'localhost', '::1') and not cfg.get('token'):
+        # aperto alla rete di casa senza token = chiunque nella rete puo' usare Claude e la casa
+        print('Bridge NON avviato: con host %s serve un "token" nel config (o host 127.0.0.1).' % host)
+        return 1
+    srv = ThreadingHTTPServer((host, cfg['port']), Handler)
     print('AurI Bridge su porta %d, cartella %s' % (cfg['port'], cfg['cwd']))
     srv.serve_forever()
 

@@ -17,7 +17,7 @@ BRIDGE = 'bridge'
 # Quanti messaggi di storia tenere (domanda + risposta = 2): il contesto di un modello piccolo e' corto.
 STORIA = 6
 # Un display da 14 colonne per 3 righe: risposte di una o due frasi.
-MAX_TOKEN = 150
+MAX_TOKEN = 90       # due frasi brevi: risposte piu rapide e meno occasioni di perdersi
 
 PERSONA = {
     'it': ("Ti chiami AurI. Sei l'assistente che vive dentro un vecchio telefono con lo schermo piccolo. "

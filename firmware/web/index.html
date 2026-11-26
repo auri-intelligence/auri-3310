@@ -548,7 +548,8 @@ addEventListener('keyup', e => {
     // world leaderboard address, a plain text file in the repo
     const sc = await fetch('classifica.txt', { cache: 'no-store' }).catch(() => null);
     const su = sc && sc.ok ? (await sc.text()).trim() : '';
-    if (su.startsWith('https://')) { const c3 = JSON.parse(cfg); c3.scores_url = su; cfg = JSON.stringify(c3); }
+    // nel banco di prova niente classifica mondiale: i punteggi delle prove non devono finire online
+    if (su.startsWith('https://') && !location.hash.includes('banco')) { const c3 = JSON.parse(cfg); c3.scores_url = su; cfg = JSON.stringify(c3); }
     mp.FS.writeFile('/config.json', cfg);
     py(`
 import sys, json
