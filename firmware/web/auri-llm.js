@@ -399,9 +399,12 @@
   // --- misuratore del microfono: livello vero in dB (-60..0 -> 0..100) per le tacche "ti ascolto" ---
   // Su alcuni Android aprire il microfono due volte (misuratore + riconoscimento) fa fallire il riconoscimento:
   // se succede, il misuratore si spegne da solo e la scelta resta (auri.mic.nometro).
-  let metro = null, livello = 0, ascolto = 0;
+  let metro = null, livello = 0, ascolto = 0, impulso = 0;
+  // Sui telefoni il microfono e' uno solo: se lo apre il misuratore, il riconoscimento riceve silenzio
+  // ("non ho sentito" anche con la barra che si muove). Li' le tacche seguono gli eventi del riconoscimento.
+  const MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
   async function apriMetro() {
-    if (metro || store.get('auri.mic.nometro', '') === '1' || !navigator.mediaDevices) return;
+    if (MOBILE || metro || store.get('auri.mic.nometro', '') === '1' || !navigator.mediaDevices) return;
     const mio = ascolto;
     try {
       const flusso = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
@@ -432,7 +435,16 @@
     metro = null;
     livello = 0;
   }
-  window.auriMicLevel = () => livello;
+  window.auriMicLevel = () => {
+    if (metro) return livello;
+    if (!MOBILE || hearDone) return -1;
+    // senza misuratore: piu' alte quando il riconoscimento sente suono/voce o aggiorna il testo
+    const t = Date.now();
+    const base = parlando ? 55 : sentito ? 35 : 10;
+    const v = base + Math.max(0, 40 - (t - impulso) / 10) + (Math.sin(t / 70) + 1) * 8;
+    return Math.max(0, Math.min(100, Math.round(v)));
+  };
+  let parlando = false;
   let sentito = false;
 
   window.auriHearStart = lang => {
@@ -441,6 +453,7 @@
     hearErr = '';
     hearDone = false;
     sentito = false;
+    parlando = false;
     ascolto++;
     // niente audio nostro mentre si ascolta: su Android un AudioContext attivo puo' disturbare il riconoscimento
     try { if (window.auriAudioPausa) window.auriAudioPausa(true); speechSynthesis.cancel(); } catch (e) {}
@@ -453,11 +466,14 @@
       rec.maxAlternatives = 1;
       rec.onaudiostart = () => window.auriLog('voce', 'Riconoscimento: microfono aperto');
       rec.onsoundstart = () => { sentito = true; window.auriLog('voce', 'Riconoscimento: sento un suono'); };
-      rec.onspeechstart = () => window.auriLog('voce', 'Riconoscimento: sento parlare');
+      rec.onspeechstart = () => { parlando = true; impulso = Date.now(); };
+      rec.onspeechend = () => { parlando = false; };
+      
       rec.onresult = e => {
         let s = '';
         for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript;
         heard = s.trim();
+        impulso = Date.now();
       };
       rec.onerror = e => {
         const c = String(e.error || 'errore');
@@ -475,6 +491,7 @@
         hearDone = true;
         window.auriLog('voce', 'Riconoscimento finito: ' + (heard ? '"' + heard.slice(0, 60) + '"' : 'niente testo') + (sentito ? '' : ', nessun suono'));
         chiudiMetro();
+        rec = null;
         try { if (window.auriAudioPausa) window.auriAudioPausa(false); } catch (e) {}
       };
       rec.start();
@@ -493,9 +510,18 @@
     ascolto++;
     try { if (rec) rec.stop(); } catch (e) {}
     const r = rec;
-    setTimeout(() => { if (r && !hearDone) { try { r.abort(); } catch (e) {} hearDone = true; } }, 3000);
+    setTimeout(() => { if (r && !hearDone) { try { r.abort(); } catch (e) {} hearDone = true; } }, 1500);
     return '';
   };
+  // si cambia app o si chiude la scheda: il microfono si spegne di colpo, mai lasciato in attesa
+  const spegniTutto = () => {
+    chiudiMetro();
+    ascolto++;
+    if (rec) { try { rec.abort(); } catch (e) {} rec = null; hearDone = true; }
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) spegniTutto(); });
+  window.addEventListener('pagehide', spegniTutto);
+  window.addEventListener('blur', () => { if (rec && document.hidden) spegniTutto(); });
 
   // Il permesso del microfono va chiesto dentro un tocco dell'utente, se no su iPhone il
   // riconoscimento parte e muore subito. Il pulsante del pannello serve a questo.
