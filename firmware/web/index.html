@@ -394,9 +394,7 @@ function draw(now) {
   const lit = now < litUntil;
   if (lit !== wasLit) { wasLit = lit; dirty = true; phone.classList.toggle('glow', lit); }
   if (!dirty) return requestAnimationFrame(draw);
-  // al massimo 30 disegni al secondo: lo schermo vero non va piu' veloce e il telefono respira
-  if (now - lastPaint < 30) return requestAnimationFrame(draw);
-  lastPaint = now;
+  // nessun limite di fotogrammi: con il limite a 30/s sui telefoni a 60-120 Hz lo scorrimento "ondeggiava"
   // niente scia (ghosting): ogni pixel passa subito al colore nuovo, anche nei giochi e nella fotocamera
   const a = 1;
   const bg = lit ? BG_LIT : BG_DARK, fg = lit ? FG_LIT : FG_DARK;

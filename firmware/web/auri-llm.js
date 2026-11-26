@@ -399,11 +399,14 @@
   // --- misuratore del microfono: livello vero in dB (-60..0 -> 0..100) per le tacche "ti ascolto" ---
   // Su alcuni Android aprire il microfono due volte (misuratore + riconoscimento) fa fallire il riconoscimento:
   // se succede, il misuratore si spegne da solo e la scelta resta (auri.mic.nometro).
-  let metro = null, livello = 0;
+  let metro = null, livello = 0, ascolto = 0;
   async function apriMetro() {
     if (metro || store.get('auri.mic.nometro', '') === '1' || !navigator.mediaDevices) return;
+    const mio = ascolto;
     try {
       const flusso = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      // il tasto e' gia' stato rilasciato mentre il microfono si apriva: si chiude subito, mai acceso per niente
+      if (mio !== ascolto || hearDone) { flusso.getTracks().forEach(t => t.stop()); return; }
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const an = ctx.createAnalyser();
       an.fftSize = 512;
@@ -438,6 +441,7 @@
     hearErr = '';
     hearDone = false;
     sentito = false;
+    ascolto++;
     // niente audio nostro mentre si ascolta: su Android un AudioContext attivo puo' disturbare il riconoscimento
     try { if (window.auriAudioPausa) window.auriAudioPausa(true); speechSynthesis.cancel(); } catch (e) {}
     apriMetro();
@@ -482,7 +486,16 @@
     }
   };
 
-  window.auriHearStop = () => { try { if (rec) rec.stop(); } catch (e) {} return ''; };
+  // rilascio del tasto: il microfono si chiude SUBITO (misuratore compreso); il riconoscimento consegna
+  // l'ultimo testo e si ferma. Se entro 3 s non ha finito, si interrompe del tutto.
+  window.auriHearStop = () => {
+    chiudiMetro();
+    ascolto++;
+    try { if (rec) rec.stop(); } catch (e) {}
+    const r = rec;
+    setTimeout(() => { if (r && !hearDone) { try { r.abort(); } catch (e) {} hearDone = true; } }, 3000);
+    return '';
+  };
 
   // Il permesso del microfono va chiesto dentro un tocco dell'utente, se no su iPhone il
   // riconoscimento parte e muore subito. Il pulsante del pannello serve a questo.
