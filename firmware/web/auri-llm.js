@@ -402,7 +402,6 @@
   let metro = null, livello = 0, ascolto = 0, impulso = 0;
   // Sui telefoni il microfono e' uno solo: se lo apre il misuratore, il riconoscimento riceve silenzio
   // ("non ho sentito" anche con la barra che si muove). Li' le tacche seguono gli eventi del riconoscimento.
-  const MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
   async function apriMetro() {
     if (MOBILE || metro || store.get('auri.mic.nometro', '') === '1' || !navigator.mediaDevices) return;
     const mio = ascolto;
