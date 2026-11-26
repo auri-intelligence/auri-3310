@@ -23,6 +23,8 @@ class Assistente(App):
         super().__init__(sys)
         self.brain = Cervello(sys)
         self.trigger = trigger
+        self.detti = 0             # frasi d attesa gia dette (anche quando la domanda arriva dalla voce)
+        self.t_think = sys.hal.ticks_ms()
         self.lines = []
         self.pos = 0
         self.input = MultiTap()
@@ -68,9 +70,14 @@ class Assistente(App):
         except Exception:
             pass
         self.brain.chiedi(testo)
+        self._pensa()
+
+    def _pensa(self):
+        """Entra in "sto pensando": riparte il conto dei secondi e delle frasi d'attesa (T9, voce o bridge)."""
+        if self.state != 'think':
+            self.t_think = self.sys.hal.ticks_ms()
+            self.detti = 0
         self.state = 'think'
-        self.t_think = self.sys.hal.ticks_ms()
-        self.detti = 0
 
     def _show(self):
         txt = self.brain.text or self.brain.error or t('no_answer')
@@ -148,7 +155,7 @@ class Assistente(App):
             self.brain.basta_ascolto()
             r = self.brain.ascolto_poll()
             if r is None:
-                self.state = 'think'       # la voce passa dal bridge: aspetta la risposta
+                self._pensa()       # la voce passa dal bridge: aspetta la risposta
             else:
                 self.state = 'hear'        # riconoscimento nel browser: aspetta il testo
         elif k == keys.NAVI and self._navi:
@@ -162,7 +169,7 @@ class Assistente(App):
             # cervello del browser finche' non e' pronto, poi la domanda riparte da sola
             fase = self.brain.info().get('phase')
             if self.brain.pronto():
-                self.state = 'think'
+                self._pensa()
             elif fase == 'load':
                 self.state = 'load'
             elif self.state not in ('off', 'load'):
@@ -171,7 +178,10 @@ class Assistente(App):
             info = self.brain.info()
             if info.get('phase') == 'ready':
                 # se c'era una domanda in sospeso riparte da sola, senza riscriverla
-                self.state = 'think' if self.brain.sospesa else 'idle'
+                if self.brain.sospesa:
+                    self._pensa()
+                else:
+                    self.state = 'idle'
                 self._last = None
                 self.sys.vibrate(60)
                 return True
@@ -191,7 +201,7 @@ class Assistente(App):
         if self.state == 'hear':
             r = self.brain.ascolto_poll()
             if r is None:
-                self.state = 'think'
+                self._pensa()
                 return True
             testo, finito = r
             if testo != self.heard:
