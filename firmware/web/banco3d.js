@@ -31,9 +31,12 @@ const railZ = (b, s) => b === 1 ? Z1 + (s > 0 ? 19.5 : 22.04) : Z2 - (s > 0 ? 19
 const rail = (b, s, c) => V(colX(railCol(c)), 0, railZ(b, s));
 
 // ---------- scena ----------
+// telefono (schermo stretto o tocco): interfaccia tipo app, meno pixel e tubi piu' leggeri
+const MOB = matchMedia('(max-width: 760px)').matches;
+const SEG = MOB ? 40 : 80;
 const box = document.getElementById('scena');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, MOB ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 box.appendChild(renderer.domElement);
@@ -41,6 +44,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0f1115);
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 4000);
 camera.position.set(-20, 260, 260);
+if (MOB) camera.position.set(-30, 380, 420);   // sul telefono lo schermo e' stretto: si parte piu' lontani
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
 controls.enableDamping = true;
@@ -325,7 +329,7 @@ function puntali(mesh, pts) {
 function wire(a, b, color, h, meta) {
   const curve = curvaFilo(a, b, h);
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.5, transparent: true, opacity: 1 });
-  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 80, 0.7, 8), m);
+  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, SEG, 0.7, MOB ? 6 : 8), m);
   mesh.userData.wire = conns.length;
   scene.add(mesh);
   puntali(mesh, [a, b]);
@@ -425,7 +429,8 @@ function select(i, fly = true) {
   sel = i;
   tab.querySelectorAll('tr.c').forEach(r => r.classList.toggle('sel', +r.dataset.i === i));
   wires.forEach(w => { const on = i < 0 || w.userData.wire === i; w.material.opacity = on ? 1 : 0.18; w.material.emissive.setHex(w.userData.wire === i ? 0x335522 : 0); });
-  if (i >= 0 && fly) { flyTo(conns[i].mid, 70); showInfo(conns[i].comp); }
+  if (i >= 0 && fly) { flyTo(conns[i].mid, MOB ? 170 : 70); showInfo(conns[i].comp); }
+  if (i >= 0 && MOB && window.UI) UI.apri('guasti', 'meta');
   aspetto();
   pannelloProva();
 }
@@ -446,27 +451,56 @@ if (innerWidth < 760) document.body.classList.add('closed');
 
 // ---------- camera e picking ----------
 let fly = null;
-function flyTo(p, dist) {
-  const dir = camera.position.clone().sub(controls.target).normalize();
+function flyTo(p, dist, dirForzata) {
+  const dir = dirForzata ? dirForzata.clone().normalize() : camera.position.clone().sub(controls.target).normalize();
   fly = { t0: performance.now(), a: controls.target.clone(), b: p.clone(), ca: camera.position.clone(), cb: p.clone().addScaledVector(dir, dist) };
 }
 const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
 let down = null;
 renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+// filo piu' vicino al punto toccato, in pixel sullo schermo (i fili sono sottili: col dito si sbaglia)
+function filoVicino(x, y, soglia) {
+  const r = renderer.domElement.getBoundingClientRect(), v = new THREE.Vector3();
+  let best = -1, bd = soglia;
+  for (const w of wires) {
+    if (!w.visible || w.material.opacity === 0.18) continue;
+    const path = w.geometry.parameters && w.geometry.parameters.path; if (!path) continue;
+    for (let k = 0; k <= 24; k++) {
+      v.copy(path.getPoint(k / 24)).project(camera);
+      if (v.z > 1) continue;
+      const d = Math.hypot((v.x + 1) / 2 * r.width + r.left - x, (1 - v.y) / 2 * r.height + r.top - y);
+      if (d < bd) { bd = d; best = w.userData.wire; }
+    }
+  }
+  return best;
+}
+let ultimoTocco = { t: 0, x: 0, y: 0 };
 renderer.domElement.addEventListener('pointerup', e => {
-  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > (MOB ? 12 : 6)) return;
   const r = renderer.domElement.getBoundingClientRect();
   ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
   ray.setFromCamera(ptr, camera);
+  // doppio tocco: inquadra il punto toccato
+  const ora = performance.now();
+  if (ora - ultimoTocco.t < 320 && Math.hypot(e.clientX - ultimoTocco.x, e.clientY - ultimoTocco.y) < 30) {
+    const h2 = ray.intersectObjects(scene.children, true).find(h => h.object.visible);
+    if (h2) flyTo(h2.point, Math.max(40, camera.position.distanceTo(controls.target) * 0.45));
+    ultimoTocco.t = 0; return;
+  }
+  ultimoTocco = { t: ora, x: e.clientX, y: e.clientY };
   const hit = ray.intersectObjects([...wires, ...Object.values(groups), gSald, gFin], true).find(h => h.object.visible && h.object.material.opacity !== 0.18);
-  if (!hit) { select(-1, false); return; }
-  let o = hit.object;
+  let o = hit ? hit.object : null;
   while (o && o.userData.wire === undefined && !o.userData.comp && o.userData.sald === undefined && !o.userData.fin) o = o.parent;
-  if (!o) return;
-  if (o.userData.fin) { infoFin(o.userData.fin); if (innerWidth < 760) document.body.classList.remove('closed'); }
-  else if (o.userData.sald !== undefined) { infoSald(o.userData.sald); if (innerWidth < 760) document.body.classList.remove('closed'); }
+  // niente filo preso in pieno: se ce n'e' uno vicino al dito (e non si e' toccato un pezzo preciso) vince il filo
+  if (VISTA === 'banco' && (!o || (o.userData.wire === undefined && o.userData.sald === undefined && ['bb', 'devkit'].includes(o.userData.comp)))) {
+    const f = filoVicino(e.clientX, e.clientY, MOB ? 26 : 10);
+    if (f >= 0) { select(f); tab.querySelector(`tr[data-i="${f}"]`)?.scrollIntoView({ block: 'nearest' }); return; }
+  }
+  if (!o) { select(-1, false); return; }
+  if (o.userData.fin) { infoFin(o.userData.fin); if (MOB) UI.apri('info', 'meta'); else if (innerWidth < 760) document.body.classList.remove('closed'); }
+  else if (o.userData.sald !== undefined) { infoSald(o.userData.sald); if (MOB) UI.apri('info', 'meta'); else if (innerWidth < 760) document.body.classList.remove('closed'); }
   else if (o.userData.wire !== undefined) { select(o.userData.wire); tab.querySelector(`tr[data-i="${o.userData.wire}"]`)?.scrollIntoView({ block: 'nearest' }); }
-  else { showInfo(o.userData.comp); if (innerWidth < 760) document.body.classList.remove('closed'); }
+  else { showInfo(o.userData.comp); if (MOB) UI.apri('info', 'meta'); else if (innerWidth < 760) document.body.classList.remove('closed'); }
 });
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 renderer.setAnimationLoop(() => {
@@ -475,7 +509,9 @@ renderer.setAnimationLoop(() => {
     controls.target.lerpVectors(fly.a, fly.b, s); camera.position.lerpVectors(fly.ca, fly.cb, s);
     if (k >= 1) fly = null;
   }
-  controls.update(); renderer.render(scene, camera);
+  controls.update();
+  if (window.UI) UI.frame();
+  renderer.render(scene, camera);
 });
 // ---------- prove guasti: stacca un filo o collegalo al pin sbagliato ----------
 // Livelli: 0 = funziona, 1 = funziona a meta, 2 = non parte / schermo morto, 3 = rischio di danni.
@@ -598,7 +634,8 @@ function disegnaTel() {
   document.getElementById('telnota').textContent = s.schermo === 'spento' ? 'spento: nessuna immagine' : s.note.join(' · ');
   document.getElementById('telfuoco').style.display = s.fuoco ? 'block' : 'none';
   const st = document.getElementById('stato');
-  st.textContent = 'Telefono: ' + LIV[s.lv]; st.className = 'l' + s.lv;
+  st.textContent = (MOB ? '' : 'Telefono: ') + (MOB ? LIV[s.lv].split(' ')[0] + ' ' + ['ok', 'a metà', 'non va', 'pericolo'][s.lv] : LIV[s.lv]); st.className = 'l' + s.lv;
+  document.getElementById('telbox').classList.toggle('allarme', s.lv > 0);
   return s;
 }
 telFrame.addEventListener('load', () => { ultimoGuasto = ''; setTimeout(disegnaTel, 1500); });
@@ -611,7 +648,7 @@ function ridisegna(c) {
   let curva, pts;
   if (c.guasto && !c.guasto.pin) { curva = curvaPenzola(c.a, c.b); pts = [c.b, curva.getPoint(1)]; }
   else { const a = c.guasto ? espHole(c.guasto.pin) : c.a; curva = curvaFilo(a, c.b, c.h); pts = [a, c.b]; }
-  m.geometry.dispose(); m.geometry = new THREE.TubeGeometry(curva, 80, 0.7, 8);
+  m.geometry.dispose(); m.geometry = new THREE.TubeGeometry(curva, SEG, 0.7, MOB ? 6 : 8);
   puntali(m, pts);
   c.mid = curva.getPoint(0.5);
   m.material.alphaMap = c.guasto && !c.guasto.pin ? tratt : null; m.material.alphaTest = c.guasto && !c.guasto.pin ? 0.5 : 0; m.material.needsUpdate = true;
@@ -633,7 +670,7 @@ function pannelloProva() {
   if (!c) h = '<p>Tocca un filo (nella scena o nella tabella), poi “Stacca” o scegli un pin sbagliato.</p>';
   else {
     const k = tipoFilo(c);
-    h = `<p><b>${c.esp} → ${c.to}</b></p><p class="bt"><button id="pStacca">${c.guasto && !c.guasto.pin ? 'Riattacca' : 'Stacca'}</button>`;
+    h = `<p id="pTitolo"><b>${c.esp} → ${c.to}</b></p><p class="bt"><button id="pStacca">${c.guasto && !c.guasto.pin ? '🔗 Riattacca' : '✂️ Stacca'}</button><button id="pVai">🎯 Vai lì</button>`;
     if (k) h += ` <select id="pPin"><option value="">collega a…</option>${PIN_ESP.map(p => `<option${c.guasto && c.guasto.pin === p ? ' selected' : ''}>${p}</option>`).join('')}</select>`;
     h += '</p>';
     if (c.guasto) { const e = c.guasto.pin ? valuta(c, c.guasto.pin) : effetto(c); h += `<div class="eff l${e.l}"><b>Cosa succede: ${LIV[e.l]}</b><br>${e.t}</div>`; }
@@ -643,6 +680,7 @@ function pannelloProva() {
   h += `<p class="bt"><button id="pDiodo">${DIODO ? 'Togli il diodo del motorino' : 'Rimetti il diodo'}</button> <button id="pReset">Rimetti tutto a posto</button></p>`;
   box.innerHTML = h;
   const q = id => document.getElementById(id);
+  if (q('pVai')) q('pVai').onclick = () => flyTo(c.mid, MOB ? 170 : 70);
   if (q('pStacca')) q('pStacca').onclick = () => { c.guasto = c.guasto && !c.guasto.pin ? null : { stacca: true }; ridisegna(c); aggiorna(); };
   if (q('pPin')) q('pPin').onchange = e => { const p = e.target.value; c.guasto = p && p !== origPin(c) ? { pin: p } : null; ridisegna(c); aggiorna(); };
   q('pDiodo').onclick = () => { DIODO = !DIODO; if (groups.vibra) groups.vibra.children.filter(m => m.userData.diodo).forEach(m => { m.visible = DIODO; }); aggiorna(); };
@@ -800,12 +838,154 @@ function vista(v) {
   gFin.visible = !banco;
   document.querySelectorAll('#viste button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   document.body.classList.toggle('finito', !banco);
-  if (banco) flyTo(V(0, 0, 0), 370); else { esplodi(+document.getElementById('esplodi').value); flyTo(V(0, 40, 0), 260); }
+  controls.maxPolarAngle = Math.PI * 0.49;
+  if (banco) flyTo(V(0, 0, 0), MOB ? 560 : 370); else { esplodi(+document.getElementById('esplodi').value); flyTo(V(0, 40, 0), MOB ? 380 : 260); }
+  if (window.UI) UI.chips();
 }
 document.querySelectorAll('#viste button').forEach(b => b.addEventListener('click', () => vista(b.dataset.v)));
 document.getElementById('esplodi').addEventListener('input', e => esplodi(+e.target.value));
 esplodi(0.5);
 
+// ---------- interfaccia per il telefono: foglio dal basso, bolla del telefono, chip di inquadratura ----------
+const UI = (() => {
+  const aside = document.querySelector('aside'), corpo = document.getElementById('corpo');
+  const tabsEl = document.getElementById('tabs'), telbox = document.getElementById('telbox');
+  let tabAttiva = 'coll', posSheet = 'chiuso';
+  const altezze = () => ({ chiuso: 66 + safeB(), meta: Math.round(innerHeight * 0.52), tutto: innerHeight - 56 - safeT() });
+  const cssPx = v => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;visibility:hidden;height:' + v; document.body.appendChild(d); const h = d.offsetHeight; d.remove(); return h; };
+  const safeB = () => cssPx('env(safe-area-inset-bottom, 0px)'), safeT = () => cssPx('env(safe-area-inset-top, 0px)');
+  // la scena 3D si centra nello spazio libero sopra il foglio (non dietro)
+  function offset(h) {
+    if (!MOB) return;
+    camera.setViewOffset(innerWidth, innerHeight, 0, Math.round((h - 40) / 2), innerWidth, innerHeight);
+    camera.updateProjectionMatrix();
+  }
+  function altezza(h, anima = true) {
+    aside.classList.toggle('trascino', !anima);
+    aside.style.setProperty('--sh', h + 'px');
+    offset(h);
+  }
+  function scheda(t) {
+    tabAttiva = t;
+    corpo.querySelectorAll('section').forEach(sx => sx.classList.toggle('on', sx.dataset.t === t));
+    tabsEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    corpo.scrollTop = 0;
+    if (t === 'info' && !document.getElementById('info').innerHTML) showInfo('devkit');
+  }
+  function apri(t, pos) {
+    if (!MOB) { document.body.classList.remove('closed'); return; }
+    if (t) scheda(t);
+    posSheet = pos || (posSheet === 'chiuso' ? 'meta' : posSheet);
+    altezza(altezze()[posSheet]);
+  }
+  function chiudi() { if (!MOB) return; posSheet = 'chiuso'; altezza(altezze().chiuso); }
+
+  if (MOB) {
+    document.body.classList.remove('closed');
+    scheda('coll');
+    altezza(altezze().chiuso, false);
+    tabsEl.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.t === tabAttiva && posSheet !== 'chiuso') { chiudi(); return; }
+      apri(b.dataset.t, posSheet === 'chiuso' ? 'meta' : posSheet);
+    });
+    // trascinare la maniglia (o la barra delle schede) apre e chiude il foglio
+    const man = document.getElementById('maniglia');
+    let tr = null;
+    const inizio = e => { tr = { y: e.clientY, h: aside.getBoundingClientRect().height, mosso: false, id: e.pointerId }; };
+    const muovi = e => {
+      if (!tr || e.pointerId !== tr.id) return;
+      const dy = tr.y - e.clientY;
+      if (Math.abs(dy) > 6) tr.mosso = true;
+      if (!tr.mosso) return;
+      const a = altezze();
+      altezza(Math.max(a.chiuso, Math.min(a.tutto, tr.h + dy)), false);
+    };
+    const fine = e => {
+      if (!tr || e.pointerId !== tr.id) return;
+      const a = altezze(), h = aside.getBoundingClientRect().height;
+      if (!tr.mosso) { if (e.currentTarget === man) { posSheet === 'chiuso' ? apri(null, 'meta') : chiudi(); } tr = null; return; }
+      const v = tr.y - e.clientY;    // verso del gesto: decide in quale posizione fermarsi
+      let pos = Object.keys(a).reduce((m, k) => Math.abs(a[k] - h) < Math.abs(a[m] - h) ? k : m, 'chiuso');
+      if (Math.abs(v) > 60) pos = v > 0 ? (h > a.meta + 20 ? 'tutto' : 'meta') : (h < a.meta - 20 ? 'chiuso' : 'meta');
+      tr = null;
+      if (pos === 'chiuso') chiudi(); else apri(null, pos);
+    };
+    for (const el of [man, tabsEl]) {
+      el.addEventListener('pointerdown', e => { inizio(e); if (el === man) man.setPointerCapture(e.pointerId); });
+      el.addEventListener('pointermove', muovi);
+      el.addEventListener('pointerup', fine);
+      el.addEventListener('pointercancel', () => { tr = null; });
+    }
+    document.getElementById('stato').addEventListener('click', () => apri(VISTA === 'banco' ? 'guasti' : 'info', 'meta'));
+    addEventListener('resize', () => altezza(altezze()[posSheet], false));
+
+    // bolla del telefono vero: si trascina dalla barretta, ⤢ la apre a tutto schermo
+    const bar = document.getElementById('telbar');
+    let tb = null;
+    bar.addEventListener('pointerdown', e => {
+      if (e.target.closest('button') || telbox.classList.contains('grande')) return;
+      const r = telbox.getBoundingClientRect();
+      tb = { dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId }; bar.setPointerCapture(e.pointerId);
+    });
+    bar.addEventListener('pointermove', e => {
+      if (!tb || e.pointerId !== tb.id) return;
+      const r = telbox.getBoundingClientRect();
+      const x = Math.max(4, Math.min(innerWidth - r.width - 4, e.clientX - tb.dx));
+      const y = Math.max(56, Math.min(innerHeight - r.height - 70, e.clientY - tb.dy));
+      telbox.style.left = x + 'px'; telbox.style.top = y + 'px'; telbox.style.right = 'auto';
+    });
+    bar.addEventListener('pointerup', () => { tb = null; });
+  }
+  function telefono(on) {
+    telbox.classList.toggle('grande', on);
+    document.getElementById('telgrande').textContent = on ? '✕' : '⤢';
+    document.getElementById('telgrande').title = on ? 'Chiudi' : 'Apri grande';
+    if (on) { telbox.dataset.st = telbox.getAttribute('style') || ''; telbox.removeAttribute('style'); }
+    else if (telbox.dataset.st !== undefined) telbox.setAttribute('style', telbox.dataset.st);
+  }
+  document.getElementById('telgrande').addEventListener('click', () => telefono(!telbox.classList.contains('grande')));
+  document.getElementById('telmin').addEventListener('click', () => telbox.classList.toggle('min'));
+
+  // chip di inquadratura
+  const chipsEl = document.getElementById('chips');
+  const centro = gs => { const b = new THREE.Box3(); gs.forEach(g => b.expandByObject(g)); const c = b.getCenter(V(0, 0, 0)), z = b.getSize(V(0, 0, 0)); return [c, Math.max(z.x, z.z, 30)]; };
+  const vai = gs => { const [c, z] = centro(gs.filter(Boolean)); flyTo(c, z * (MOB ? 2.1 : 1.5)); };
+  const CHIP_BANCO = [
+    ['Tutto', () => flyTo(V(0, 0, 0), MOB ? 560 : 370)],
+    ['ESP32', () => vai([groups.devkit])],
+    ['Display', () => vai([groups.lcd])],
+    ['Tastiera', () => vai([groups.keypad])],
+    ['microSD', () => vai([groups.sd])],
+    ['Audio', () => vai([groups.mic, groups.amp, groups.piezo])],
+    ['Vibrazione', () => vai([groups.vibra])],
+    ['Corrente', () => vai([groups.alim])],
+  ];
+  const CHIP_FIN = [
+    ['Fronte', () => { controls.maxPolarAngle = Math.PI * 0.49; esplodi(0); document.getElementById('esplodi').value = 0; flyTo(V(0, 10, 0), MOB ? 300 : 200, V(0, 1, 0.35)); }],
+    ['Esploso', () => { controls.maxPolarAngle = Math.PI * 0.49; esplodi(1); document.getElementById('esplodi').value = 1; flyTo(V(0, 50, 0), MOB ? 420 : 300, V(0.6, 0.7, 0.8)); }],
+    ['Metà', () => { controls.maxPolarAngle = Math.PI * 0.49; esplodi(0.5); document.getElementById('esplodi').value = 0.5; flyTo(V(0, 40, 0), MOB ? 380 : 260); }],
+    ['Retro', () => { controls.maxPolarAngle = Math.PI; esplodi(0); document.getElementById('esplodi').value = 0; flyTo(V(0, 0, 0), MOB ? 300 : 200, V(0, -1, 0.35)); }],
+  ];
+  function chips() {
+    const lista = VISTA === 'banco' ? CHIP_BANCO : CHIP_FIN;
+    chipsEl.innerHTML = lista.map(([n], i) => `<button data-i="${i}">${n}</button>`).join('');
+    chipsEl.onclick = e => { const b = e.target.closest('button'); if (!b) return; lista[+b.dataset.i][1](); chipsEl.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  }
+  chips();
+
+  // etichette 3D: sul telefono piccole e solo quando servono (scheda Saldature aperta o da vicino)
+  const vv = new THREE.Vector3();
+  function frame() {
+    if (!MOB) return;
+    const vicino = p => camera.position.distanceTo(p.getWorldPosition(vv)) < 150;
+    for (const o of gSald.children) if (o.isSprite) { o.visible = (tabAttiva === 'sald' && posSheet !== 'chiuso') || vicino(o); o.scale.set(22, 4.1, 1); }
+    for (const l of finLabels) { l.visible = (tabAttiva === 'info' && posSheet !== 'chiuso') || vicino(l) || camera.position.distanceTo(controls.target) < 230; l.scale.set(19, 3.6, 1); }
+  }
+  return { apri, chiudi, scheda, telefono, chips, frame, stato: () => ({ tab: tabAttiva, pos: posSheet }) };
+})();
+window.UI = UI;
+
 // per le prove automatiche
 const prova = { stacca: i => { conns[i].guasto = { stacca: true }; ridisegna(conns[i]); aggiorna(); }, sposta: (i, p) => { conns[i].guasto = { pin: p }; ridisegna(conns[i]); aggiorna(); }, variante, statoTel, valuta, effetto, vista, esplodi };
-window.banco = { conns, groups, select, flyTo, camera, controls, prova, pronto: true };
+window.banco = { conns, groups, select, flyTo, camera, controls, prova, ui: UI, pronto: true };
