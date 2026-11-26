@@ -50,7 +50,10 @@ PERSONA = {
 # Un botta e risposta di esempio prima della domanda vera: con i modelli piccoli (0,5 miliardi di
 # parametri) e' la differenza fra "sono AurI" e un modello che si inventa il nome di un altro assistente.
 ESEMPIO = {
-    'it': ('Chi sei?', "Sono AurI, l'assistente di questo telefono. Dimmi pure."),
+    # piu' esempi in italiano: nel banco di prova il Base 0.5B con il solo "Chi sei?" rispondeva vago
+    'it': (('Chi sei?', "Sono AurI, l'assistente di questo telefono. Dimmi pure."),
+           ('Cosa sai fare?', "Rispondo alle tue domande, ti spiego le cose e ti tengo compagnia. Prova a chiedermi qualcosa."),
+           ('Quanto fa 7 per 8?', 'Fa 56.')),
     'en': ('Who are you?', "I'm AurI, the assistant in this phone. Go ahead, ask me."),
     'es': ('Quien eres?', 'Soy AurI, el asistente de este telefono. Dime.'),
     'fr': ('Qui es-tu?', "Je suis AurI, l'assistant de ce telephone. Vas-y, demande."),
@@ -111,7 +114,9 @@ def persona():
 
 
 def esempio():
-    return ESEMPIO.get(i18n.lang, ESEMPIO['it'])
+    """Coppie (domanda, risposta) di esempio per la lingua attuale."""
+    e = ESEMPIO.get(i18n.lang, ESEMPIO['it'])
+    return e if isinstance(e[0], tuple) else (e,)
 
 
 def pulisci(txt):
@@ -248,10 +253,9 @@ class Cervello:
 
     def _manda_locale(self):
         """Manda al cervello del browser la conversazione fin qui."""
-        dom, ris = esempio()
-        msgs = [{'role': 'system', 'content': persona()},
-                {'role': 'user', 'content': dom},
-                {'role': 'assistant', 'content': ris}]
+        msgs = [{'role': 'system', 'content': persona()}]
+        for dom, ris in esempio():
+            msgs += [{'role': 'user', 'content': dom}, {'role': 'assistant', 'content': ris}]
         for who, txt in self.storia[-STORIA:]:
             msgs.append({'role': 'user' if who == 'u' else 'assistant', 'content': txt})
         # 'speak' accende la lettura frase per frase nel browser: AurI comincia a parlare
@@ -302,13 +306,20 @@ class Cervello:
 
     def _poll_bridge(self):
         if self._pending is not None:
+            # la domanda parte in background: lo schermo (snake, frasi) e i tasti restano vivi
+            from auri.net import Richiesta
             testo, self._pending = self._pending, None
             cfg = self.sys.config
             body = {'text': testo, 'session': self.session, 'mode': 'assist', 'language': i18n.lang}
-            try:
-                r = self.hal.request('POST', cfg['bridge_url'] + '/v1/chat', body, cfg.get('token'))
-            except Exception:
-                r = None
+            self._req_testo = testo
+            self._req = Richiesta(self.hal, 'POST', cfg['bridge_url'] + '/v1/chat', body, cfg.get('token'))
+            return True
+        if getattr(self, '_req', None) is not None:
+            if not self._req.poll():
+                return False
+            req, self._req = self._req, None
+            testo = self._req_testo
+            r = req.dati if not req.errore and isinstance(req.dati, dict) else None
             if r is None or r.get('error') == 'no_llm':
                 from auri.i18n import t
                 # Il bridge di casa e' spento: se qui c'e' un cervello si continua con quello,
@@ -358,6 +369,7 @@ class Cervello:
 
     def ferma(self):
         self.done = True
+        self._req = None          # una risposta del bridge che arriva dopo lo stop si butta
         f = getattr(self.hal, 'ai_stop', None)
         if f and self.motore() == LOCALE:
             f()

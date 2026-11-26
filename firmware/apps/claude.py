@@ -40,11 +40,10 @@ class Claude(App):
         self.scroll = 0
         self._blink = 0
         self._navi = False
-        try:
-            cfg = sys.config
-            self.info.update(sys.hal.request('GET', cfg['bridge_url'] + '/v1/info', None, cfg.get('token')))
-        except Exception:
-            self.info['plan'] = t('offline')
+        from auri.net import Richiesta
+        cfg = sys.config
+        self._req = None
+        self._req_info = Richiesta(sys.hal, 'GET', cfg['bridge_url'] + '/v1/info', None, cfg.get('token'))
 
     def _save(self):
         self.sys.hal.save('claude', {'model': self.model, 'effort': self.effort, 'perm': self.perm,
@@ -55,6 +54,11 @@ class Claude(App):
             self.state = 'chat'
             if k not in (keys.NAVI, keys.C):
                 self.on_key(k)
+            return
+        if self.state == 'busy' and k == keys.C:
+            self._req = None          # C ferma l'attesa: la risposta, se arriva, si butta
+            self.state = 'chat'
+            self.log.append(('!', t('stop')))
             return
         if self.state != 'chat':
             return
@@ -98,6 +102,8 @@ class Claude(App):
                 'permission_mode': PERMS[self.perm][1], 'remote': self.remote, 'language': i18n.lang}
 
     def tick(self, now):
+        if self._rete() or self.state == 'busy':
+            return True
         if self.state == 'voice':
             r = self.sys.hal.voice_poll()
             if r is None:
@@ -122,15 +128,35 @@ class Claude(App):
         return False
 
     def _ask(self, path, body):
+        # in background: la risposta di Claude puo' metterci minuti, il telefono resta vivo (snake)
+        from auri.net import Richiesta
         cfg = self.sys.config
         body.update(self._params())
-        try:
-            r = self.sys.hal.request('POST', cfg['bridge_url'] + path, body, cfg.get('token'))
-        except Exception as e:
-            self.state = 'chat'
-            self.log.append(('!', t('bridge_down')))
-            return
-        self._handle(r)
+        self.state = 'busy'
+        self._req = Richiesta(self.sys.hal, 'POST', cfg['bridge_url'] + path, body, cfg.get('token'))
+
+    def _rete(self):
+        """Segue le richieste in corso; True se e' cambiato qualcosa."""
+        cambiato = False
+        ri = getattr(self, '_req_info', None)
+        if ri is not None and ri.poll():
+            self._req_info = None
+            if isinstance(ri.dati, dict) and not ri.errore:
+                self.info.update(ri.dati)
+            else:
+                self.info['plan'] = t('offline')
+            cambiato = True
+        rq = getattr(self, '_req', None)
+        if rq is not None:
+            if rq.poll():
+                self._req = None
+                if rq.errore or not isinstance(rq.dati, dict):
+                    self.state = 'chat'
+                    self.log.append(('!', t('bridge_down')))
+                else:
+                    self._handle(rq.dati)
+            cambiato = True       # anche solo per far girare lo snake
+        return cambiato
 
     def _handle(self, r):
         if r.get('error'):
@@ -213,8 +239,9 @@ class Claude(App):
         for who, text in self.log:
             for i, l in enumerate(wrap(text, 12)):
                 lines.append(((who if i == 0 else ' ') + ' ' + l))
-        if self.state in ('wait', 'voice'):
-            lines.append('* ...')
+        if self.state in ('wait', 'voice', 'busy'):
+            # puntini che si muovono: si vede che sta lavorando anche se Claude ci mette minuti
+            lines.append('* ' + '.' * (1 + (self.sys.hal.ticks_ms() // 300) % 3))
         elif self.state == 'listen':
             lines.append('* ' + t('listening'))
         body = 3

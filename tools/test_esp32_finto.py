@@ -14,6 +14,7 @@ import sys
 import time as _t
 import types
 import warnings  # noqa: F401  (prima dei moduli finti)
+import threading
 try:
     from PIL import Image, PngImagePlugin  # noqa: F401
 except ImportError:
@@ -245,6 +246,71 @@ def app(s):
     return type(s.top).__name__
 
 
+LENTO = {'attivo': False}
+
+
+def bridge_lento(s, hal):
+    """Bridge che risponde dopo 2 s (thread veri): il telefono deve continuare a disegnare e leggere i tasti."""
+    def risposta(method, url, data=None, headers=None, timeout=None):
+        _t.sleep(2.0)
+        class R:
+            def json(self):
+                if url.endswith('/v1/home'):
+                    return {'entities': [{'id': 'light.sala', 'name': 'Luce sala', 'state': 'off'}]}
+                if url.endswith('/v1/info'):
+                    return {'version': '9.9', 'plan': 'Max', 'cwd': '~'}
+                return {'reply': 'Risposta dal bridge lento', 'session': 'x'}
+
+            def close(self):
+                pass
+        return R()
+    req.request = risposta
+    th.start_new_thread = lambda f, a: threading.Thread(target=f, args=a, daemon=True).start()
+
+    def segui(nome, fine, max_s=6):
+        frame0 = sum(1 for dc, b in SPI_LOG if dc == 1)
+        t0 = _t.time()
+        passi = 0
+        while _t.time() - t0 < max_s:
+            a = _t.time()
+            s.step()
+            tm.sleep_ms(20)
+            passi += 1
+            assert _t.time() - a < 0.5, "%s: un passo e' durato %.1f s (bloccato dalla rete?)" % (nome, _t.time() - a)
+            if fine():
+                break
+            _t.sleep(0.01)
+        frame = sum(1 for dc, b in SPI_LOG if dc == 1) - frame0
+        assert fine(), "%s: non e' finito in %d s (app %s)" % (nome, max_s, app(s))
+        print("ok  %-9s col bridge lento: %d passi e %d fotogrammi durante l'attesa, nessun blocco" % (nome, passi, frame))
+
+    # AurI (motore bridge)
+    s.home(); gira(s, 200)
+    s.settings.set(brain='bridge')
+    s.assistant(); gira(s, 300)
+    a = s.top
+    a._send('che ore sono')
+    segui('AurI', lambda: a.brain.done and 'lento' in (a.brain.text or ''))
+    png('04_auri_bridge_lento')
+    # Casa
+    s.home(); gira(s, 200)
+    from apps.casa import Casa
+    s.push(Casa(s))
+    segui('Casa', lambda: app(s) == 'Menu')
+    png('05_casa_bridge_lento')
+    # Claude: info all'apertura e una domanda
+    s.home(); gira(s, 200)
+    from apps.claude import Claude
+    c = Claude(s)
+    s.push(c)
+    segui('Claude', lambda: c.info.get('plan') == 'Max')
+    c.state = 'chat'
+    c._ask('/v1/chat', {'text': 'ciao'})
+    segui('Claude 2', lambda: c.state == 'chat' and any('lento' in x for _w, x in c.log))
+    th.start_new_thread = lambda f, a: f(*a)
+    req.request = _request
+
+
 def main():
     cfg = {'bridge_url': 'http://192.168.1.2:8787', 'token': '', 'scores_url': 'https://script.example/exec'}
     hal = ESP32Hal()
@@ -294,6 +360,8 @@ def main():
         png('03_gioco_%s' % mod)
         assert STATO['vib'] == 0, 'il motorino deve spegnersi da solo'
         print('ok  gioco %-10s finito in %s (vibrazione spenta, niente blocchi)' % (mod, app(s)))
+
+    bridge_lento(s, hal)
 
     # spegnimento: deve arrivare al deep sleep senza errori
     s.home()
