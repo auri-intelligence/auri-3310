@@ -33,10 +33,11 @@ SPEAKER = 47         # piezo for tones on the bench; the MAX98357A (I2S) comes l
 
 # microSD (SPI): ci stanno il cervello locale e, volendo, tutto AurI OS.
 # Pin di banco, da confermare sul prototipo H0.
-SD_SCK = 36
-SD_MOSI = 35
-SD_MISO = 37
-SD_CS = 34
+# NON 33-37: sulla N8R8 sono della PSRAM ottale. Bus SPI3 (slot=3): lo SPI2 e' gia' del display.
+SD_SCK = 39
+SD_MOSI = 38
+SD_MISO = 40
+SD_CS = 41
 # Fotocamera OV2640 (porta DVP 8 bit): pin da fissare in fase H0, finche' manca CAM_PINS l'app dice "Niente camera".
 # CAM_PINS = {'data': [..8 pin..], 'vsync': , 'href': , 'pclk': , 'xclk': , 'sda': , 'scl': }
 SD_DIR = '/sd/auri/cervello'     # dove stanno modello.bin e tokenizer.bin

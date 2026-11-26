@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AurI-3310 · banco ESP32</title>
+<style>
+  :root { --bg: #0f1115; --panel: rgba(20,24,32,.92); --line: rgba(255,255,255,.1); --fg: #e6e8eb; --muted: #8b929b; --accent: #9fe06a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px system-ui, sans-serif; overflow: hidden; }
+  #scena { position: fixed; inset: 0; touch-action: none; }
+  aside { position: fixed; top: 0; right: 0; bottom: 0; width: 360px; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 14px 40px; z-index: 2; transition: transform .25s; }
+  body.closed aside { transform: translateX(100%); }
+  h1 { font-size: 17px; margin: 0 0 4px; } h1 b { color: var(--accent); } h1 small { font-weight: 400; color: var(--muted); font-size: 15px; }
+  h2 { font-size: 13px; color: var(--accent); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  a { color: var(--accent); }
+  p { margin: 4px 0; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 4px 3px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr.c { cursor: pointer; } tr.c:hover td { background: rgba(159,224,106,.07); } tr.sel td { background: rgba(159,224,106,.18); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid #0006; margin-right: 4px; vertical-align: -1px; }
+  .tg { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .tg label { white-space: nowrap; }
+  input[type=checkbox] { accent-color: var(--accent); }
+  .warn { background: rgba(255,190,60,.08); border-left: 3px solid #ffbe3c; padding: 6px 8px; margin: 6px 0; color: #e8d6a8; font-size: 12px; border-radius: 3px; }
+  #info { background: rgba(159,224,106,.06); border: 1px solid rgba(159,224,106,.3); border-radius: 6px; padding: 8px 10px; display: none; }
+  #info b { color: var(--accent); }
+  #apri { position: fixed; top: 12px; right: 12px; z-index: 3; border: 1px solid var(--accent); background: rgba(20,24,32,.85); color: var(--accent); border-radius: 99px; padding: 8px 14px; font: 600 13px system-ui; cursor: pointer; }
+  body:not(.closed) #apri { right: 372px; }
+  #back { position: fixed; top: 12px; left: 12px; z-index: 3; color: var(--accent); background: rgba(20,24,32,.85); border: 1px solid var(--line); border-radius: 99px; padding: 8px 14px; text-decoration: none; font: 600 13px system-ui; }
+  #hint { position: fixed; left: 12px; bottom: 12px; z-index: 1; color: var(--muted); font-size: 12px; pointer-events: none; }
+  @media (max-width: 760px) {
+    aside { top: auto; left: 0; width: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--line); }
+    body.closed aside { transform: translateY(100%); }
+    body:not(.closed) #apri { right: 12px; }
+    #hint { display: none; }
+  }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script>window.__err = []; addEventListener('error', e => __err.push(String(e.message))); addEventListener('unhandledrejection', e => __err.push(String(e.reason)));</script>
+</head>
+<body>
+<div id="scena"></div>
+<a id="back" href="./">&larr; simulatore</a>
+<button id="apri">Collegamenti</button>
+<aside>
+  <h1><b>A</b><small>ur</small><b>I</b>-3310 · banco ESP32</h1>
+  <p>Il prototipo da banco come si monta davvero: due breadboard da 830 punti affiancate, il DevKit a cavallo, i moduli sul tavolo. Misure in millimetri, pin presi da <code>firmware/hal/board.py</code>.</p>
+  <div id="info"></div>
+  <h2>Avvisi</h2>
+  <div class="warn"><b>Solo 3,3 V</b> sui GPIO: nessun pin regge 5 V. Moduli e partitore vanno sulla barra rossa da 3V3, mai sul pin 5V.</div>
+  <div class="warn"><b>GPIO 33-37 vietati</b>: sulla N8R8 sono della PSRAM ottale (35, 36, 37 sono sul connettore J3 ma non vanno usati).</div>
+  <div class="warn"><b>GPIO 38 = LED RGB</b> del DevKitC-1 v1.1: con la microSD su MOSI 38 il LED lampeggia durante le scritture. Innocuo.</div>
+  <div class="warn"><b>Pin di avvio</b>: GPIO 0 (BOOT, qui tasto Power), 3, 45, 46. Il tasto Power non va tenuto premuto all'accensione, se no la scheda entra in modalita download.</div>
+  <div class="warn"><b>Massa comune</b>: tutte le barre blu sono collegate tra loro e al GND del DevKit, anche il meno del TP4056 (OUT-).</div>
+  <div class="warn"><b>LiPo</b>: il banco va a USB. La batteria serve solo per provare carica (CHG) e lettura tensione (BAT_ADC): non collegarla mai al 3V3. Il pin CHRG del TP4056 non e sul bordo del modulo: si salda un filo al lato del LED rosso di carica.</div>
+  <div class="warn"><b>Microfono e amplificatore I2S</b>: in board.py i loro pin non ci sono ancora (il suono ora esce dal piezo su GPIO 47). Qui sono solo alimentati, i fili dati arrivano col prototipo H0. GPIO 1/2 (I2C) restano liberi.</div>
+  <h2>Moduli</h2>
+  <div class="tg" id="toggles"></div>
+  <h2>Collegamenti</h2>
+  <p>Tocca una riga: il filo si accende e la vista ci va sopra. Tocca un pezzo nella scena per le sue misure.</p>
+  <table id="conns"></table>
+  <h2>Fonti</h2>
+  <p style="font-size:11px">Pinout: guida utente ESP32-S3-DevKitC-1 v1.1 (Espressif). Modulo: datasheet ESP32-S3-WROOM-1. Misure dei moduli generici: valori tipici dei rivenditori, segnati come approssimati nella scheda di ogni pezzo. Modelli disegnati a mano, nessuna foto.</p>
+</aside>
+<div id="hint">Trascina per girare · rotella/pizzico per lo zoom · tasto destro/due dita per spostare</div>
+<script type="module" src="banco3d.js"></script>
+</body>
+</html>

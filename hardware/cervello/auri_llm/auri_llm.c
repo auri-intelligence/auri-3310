@@ -458,6 +458,9 @@ static mp_obj_t auri_start(size_t n_args, const mp_obj_t *args) {
     if (!g_prompt) mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("memoria finita"));
     g_prompt_n = encode(text, (int)len, g_prompt, (int)len + 3);
     if (g_prompt_n < 1) mp_raise_ValueError(MP_ERROR_TEXT("domanda vuota"));
+    /* max_tokens conta solo la risposta: prima una domanda lunga si mangiava tutti i passi */
+    g_steps += g_prompt_n;
+    if (g_steps > g_cfg.seq_len) g_steps = g_cfg.seq_len;
     g_token = g_prompt[0];
     g_pos = 0;
     g_running = 1;
@@ -474,8 +477,10 @@ static mp_obj_t auri_next(void) {
     } else {
         next = sample_token(logits);
     }
+    int domanda = g_pos < g_prompt_n - 1;   /* ancora dentro la domanda: gia' sul display, non si ripete */
     g_pos++;
     if (next == 1) { g_running = 0; return mp_const_none; }   /* BOS = fine del racconto */
+    if (domanda) { g_token = next; return mp_obj_new_str("", 0); }
     const char *piece = decode_piece(g_token, next);
     g_token = next;
     return mp_obj_new_str(piece, strlen(piece));

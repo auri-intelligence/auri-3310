@@ -56,7 +56,7 @@ import hal.board as board  # noqa: E402
 
 
 class Pin:
-    OUT, IN, PULL_UP = 1, 2, 3
+    OUT, IN, PULL_UP, OPEN_DRAIN = 1, 2, 3, 7
 
     def __init__(self, n, mode=None, pull=None, value=None):
         self.n = n

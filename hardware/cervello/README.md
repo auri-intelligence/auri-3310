@@ -95,10 +95,12 @@ Lettore SPI collegato così (pin di banco, da confermare in H0; stanno in `firmw
 
 | microSD | ESP32-S3 |
 |---|---|
-| SCK | GPIO 36 |
-| MOSI (DI) | GPIO 35 |
-| MISO (DO) | GPIO 37 |
-| CS | GPIO 34 |
+| SCK | GPIO 39 |
+| MOSI (DI) | GPIO 38 |
+| MISO (DO) | GPIO 40 |
+| CS | GPIO 41 |
+
+I GPIO 33-37 non si usano: sulla ESP32-S3 N8R8 sono della PSRAM ottale. La SD sta sullo SPI3 (`slot=3`), lo SPI2 e' del display.
 | VCC | 3V3 |
 | GND | GND |
 
@@ -126,7 +128,7 @@ aggiungerla al percorso **prima** di importare AurI OS:
 import sys, os, machine
 from hal import board
 try:
-    sd = machine.SDCard(slot=2, sck=machine.Pin(board.SD_SCK), mosi=machine.Pin(board.SD_MOSI),
+    sd = machine.SDCard(slot=3, sck=machine.Pin(board.SD_SCK), mosi=machine.Pin(board.SD_MOSI),
                         miso=machine.Pin(board.SD_MISO), cs=machine.Pin(board.SD_CS))
     os.mount(sd, '/sd')
     sys.path.insert(0, '/sd/auri/os')     # il codice sulla scheda vince su quello in flash

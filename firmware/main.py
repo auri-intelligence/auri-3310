@@ -21,14 +21,33 @@ synced = False
 import time
 PASSO = 20                                   # ms: il sistema e i giochi contano su un ritmo regolare
 prossimo = time.ticks_ms()
+ntp_t = prossimo
+# watchdog: se il ciclo si pianta per 10 s il chip si riavvia da solo (il telefono non ha un tasto di reset)
+try:
+    from machine import WDT
+    wdt = WDT(timeout=10000)
+except Exception:
+    wdt = None
 while True:
-    if not synced and wlan.isconnected():
+    # ora da internet: un tentativo al minuto al massimo (ognuno puo' bloccare ~1 s se manca internet)
+    if not synced and time.ticks_diff(time.ticks_ms(), ntp_t) >= 0 and wlan.isconnected():
+        ntp_t = time.ticks_add(time.ticks_ms(), 60000)
         try:
             ntptime.settime()
             synced = True
-        except OSError:
+        except Exception:
             pass
-    s.step()
+    try:
+        s.step()
+    except Exception as e:          # un'app che si rompe non deve congelare il telefono: si torna alla Home
+        print('errore:', e)
+        try:
+            s.home()
+            s.toast('Errore', 1500)
+        except Exception:
+            pass
+    if wdt:
+        wdt.feed()
     # passo fisso: si dorme solo il tempo che avanza (prima 20 ms fissi in piu' del lavoro, quindi i giochi
     # rallentavano quando il passo era pesante); se si e' in ritardo non si accumula
     prossimo = time.ticks_add(prossimo, PASSO)

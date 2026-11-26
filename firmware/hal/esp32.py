@@ -44,7 +44,8 @@ class PCD8544:
 
 class Keypad:
     def __init__(self):
-        self.rows = [machine.Pin(p, machine.Pin.OUT, value=1) for p in board.KEY_ROWS]
+        # open-drain: due tasti della stessa colonna non mettono in corto due uscite (prima: tasti fantasma)
+        self.rows = [machine.Pin(p, machine.Pin.OPEN_DRAIN, value=1) for p in board.KEY_ROWS]
         self.cols = [machine.Pin(p, machine.Pin.IN, machine.Pin.PULL_UP) for p in board.KEY_COLS]
         self.state = set()
 
@@ -109,7 +110,12 @@ class ESP32Hal:
         self._llm_text = ''
 
     def ticks_ms(self):
-        return time.ticks_ms()
+        # time.ticks_ms() ricomincia da zero ogni ~12,4 giorni: qui un contatore che cresce sempre,
+        # cosi' tutto AurI OS puo' sottrarre i tempi senza time.ticks_diff
+        t = time.ticks_ms()
+        self._mono = getattr(self, '_mono', 0) + time.ticks_diff(t, getattr(self, '_mono_t', t))
+        self._mono_t = t
+        return self._mono
 
     def localtime(self):
         return time.localtime(time.time() + board.TZ_OFFSET)
@@ -234,7 +240,7 @@ class ESP32Hal:
             return False
         try:
             import os
-            sd = machine.SDCard(slot=2, sck=machine.Pin(board.SD_SCK), mosi=machine.Pin(board.SD_MOSI),
+            sd = machine.SDCard(slot=3, sck=machine.Pin(board.SD_SCK), mosi=machine.Pin(board.SD_MOSI),
                                 miso=machine.Pin(board.SD_MISO), cs=machine.Pin(board.SD_CS))
             os.mount(sd, '/sd')
             self.sd = True
@@ -244,7 +250,14 @@ class ESP32Hal:
         return self.sd
 
     def _llm_files(self):
-        """(modello, tokenizer) sulla microSD, oppure None."""
+        """(modello, tokenizer) sulla microSD, oppure None. Ricordato: prima si leggeva la SD 3-4 volte a fotogramma."""
+        c = getattr(self, '_llm_f', 0)
+        if c != 0:
+            return c
+        self._llm_f = f = self._llm_files_sd()
+        return f
+
+    def _llm_files_sd(self):
         if not self.sd_mount():
             return None
         import os
@@ -329,16 +342,28 @@ class ESP32Hal:
         if not f or not self._llm:
             return
         import os
-        self._llm_name = f[0].split('/')[-1].replace('.bin', '')[:12]
-        self._llm.tokenizer(open(f[1], 'rb').read())
-        self._llm_size = os.stat(f[0])[6]
-        self._llm.begin(self._llm_size)
-        self._llm_file = open(f[0], 'rb')
-        self._llm_got = 0
-        self._llm_state = 'load'
+        import gc
+        try:
+            self._llm_name = f[0].split('/')[-1].replace('.bin', '')[:12]
+            self._llm_size = os.stat(f[0])[6]
+            gc.collect()
+            if self._llm_size > gc.mem_free() - 512 * 1024:      # non ci sta: errore chiaro, mai un blocco
+                raise MemoryError('modello troppo grande')
+            self._llm.tokenizer(open(f[1], 'rb').read())
+            self._llm.begin(self._llm_size)
+            self._llm_file = open(f[0], 'rb')
+            self._llm_got = 0
+            self._llm_state = 'load'
+        except Exception as e:
+            print('cervello:', e)
+            self._llm_f = 0                   # la SD si rilegge al prossimo tentativo
+            self._llm_state = 'err'
+            self._llm_text = str(e)
 
     def _llm_feed(self):
-        buf = bytearray(16384)
+        buf = getattr(self, '_llm_buf', None)
+        if buf is None:
+            buf = self._llm_buf = bytearray(16384)     # uno solo, riusato: niente GC a ogni pezzo
         n = self._llm_file.readinto(buf)
         if not n:
             self._llm_file.close()
@@ -358,7 +383,8 @@ class ESP32Hal:
             self._llm_feed()
         pct = 100 * self._llm_got // self._llm_size if self._llm_size else 0
         return {'phase': self._llm_state, 'pct': pct, 'name': self._llm_name or 'microSD',
-                'mb': max(1, self._llm_size // 1048576), 'error': ''}
+                'mb': max(1, self._llm_size // 1048576),
+                'error': self._llm_text if self._llm_state == 'err' else ''}
 
     def ai_ask(self, messages, opts=None):
         if self._llm_state not in ('ready', 'gen'):
@@ -376,9 +402,10 @@ class ESP32Hal:
         return ''
 
     def ai_poll(self):
-        """Due pezzi di testo per giro: cosi' il display continua ad aggiornarsi mentre pensa."""
+        """Un pezzo di testo per giro (ognuno ~100 ms sull'ESP32): con due il passo superava i 200 ms e
+        le pressioni lunghe (spegnimento, C) non scattavano piu' durante la risposta."""
         if self._llm_state == 'gen':
-            for _ in range(2):
+            for _ in range(1):
                 p = self._llm.next()
                 if p is None:
                     self._llm_state = 'ready'
@@ -436,6 +463,10 @@ class ESP32Hal:
                 self._req[rid] = (self.request(method, url, body, token), '')
             except Exception as e:
                 self._req[rid] = (None, str(e) or 'rete')
+        try:
+            _thread.stack_size(16 * 1024)       # TLS (mbedtls) + json non stanno nei ~5 KB di default
+        except Exception:
+            pass
         try:
             _thread.start_new_thread(lavora, ())
         except Exception:
